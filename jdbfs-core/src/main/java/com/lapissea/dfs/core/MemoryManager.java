@@ -27,11 +27,6 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
  */
 public interface MemoryManager extends DataProvider.Holder{
 	
-	interface DefragSes extends AutoCloseable{
-		@Override
-		void close();
-	}
-	
 	/**
 	 * Partial implementation of {@link MemoryManager} that reduces boilerplate for allocation and bookkeeping
 	 */
@@ -211,10 +206,8 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 	}
 	
-	DefragSes openDefragmentMode();
-	
 	/**
-	 * Lists locations of all KNOWN chunks in a sorted order from smallest to biggest. This may not be a complete list of unused chunks.
+	 * Lists locations of all KNOWN free extents in increasing address order. Persistent managers return an immutable snapshot; free pointers must be read as FreeChunk, never Chunk.
 	 */
 	IOList<ChunkPointer> getFreeChunks();
 	
@@ -275,6 +268,23 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Allocates a new independent chunk, unreferenced by anything. All instructions on what and how to allocate it are provided in the ticket.
 	 */
 	Chunk alloc(AllocateTicket ticket) throws IOException;
+	
+	/**
+	 * Allocates in existing free space before the given address
+	 *
+	 * @return newly allocated {@link Chunk} or null if no suitable region is found
+	 */
+	default Chunk allocBefore(AllocateTicket ticket, ChunkPointer before) throws IOException{
+		return alloc(ticket.withPositionMagnet(0).withApproval(chunk -> chunk.getPtr().compareTo(before)<0));
+	}
+	default boolean canAllocBefore(AllocateTicket ticket, ChunkPointer before) throws IOException{
+		return canAlloc(ticket.withPositionMagnet(0).withApproval(chunk -> chunk.getPtr().compareTo(before)<0));
+	}
+	
+	/**
+	 * Checks whether a chunk can be freed, without modifying the database.
+	 */
+	default void checkCanFree(Chunk chunk) throws IOException{ chunk.requireReal(); }
 	
 	boolean canAlloc(AllocateTicket ticket) throws IOException;
 	

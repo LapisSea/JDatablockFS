@@ -1,14 +1,13 @@
 package com.lapissea.dfs.core;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.chunk.Chunk;
-import com.lapissea.dfs.core.chunk.ChunkBuilder;
 import com.lapissea.dfs.core.chunk.ChunkSet;
+import com.lapissea.dfs.core.chunk.FreeChunk;
+import com.lapissea.dfs.core.chunk.PhysicalExtent;
+import com.lapissea.dfs.core.chunk.PhysicalExtentWalker;
 import com.lapissea.dfs.exceptions.MalformedFile;
-import com.lapissea.dfs.exceptions.OutOfBitDepth;
-import com.lapissea.dfs.io.instancepipe.ObjectPipe;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
@@ -16,21 +15,15 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.util.MathUtil;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 
-import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.logging.Log.debug;
 import static com.lapissea.dfs.logging.Log.warn;
 import static com.lapissea.dfs.type.MemoryWalker.CONTINUE;
@@ -46,440 +39,351 @@ public class DefragmentManager{
 		this.parent = parent;
 	}
 	
+	/**
+	 * Compacts existing free space synchronously. Must have exclusive, synchronous access to database.
+	 * Request unmanaged roots again after done, previously held handles can refer to moved allocations. Best ran after database open
+	 */
 	public void defragment() throws IOException{
-		debug("Defragmenting...");
-		
-		scanFreeChunks(FreeFoundAction.WARN_AND_LIST);
-		
-		mergeChains(parent);
-		optimizeFreeChunks(parent);
-		
-		mergeChains(parent);
-		optimizeFreeChunks(parent);
-		
-		pack(parent);
-		int a = 0;
-	}
-	
-	private void pack(final Cluster cluster) throws IOException{
-		// traceCall();
-		
-		var  freeChunks = cluster.getMemoryManager().getFreeChunks();
-		long prevLast   = -1;
-		while(!freeChunks.isEmpty()){
-			Chunk last = freeChunks.getLast().dereference(cluster);
-			while(!last.checkLastPhysical()){
-				last = last.nextPhysical();
-			}
-			long lp = last.getPtr().getValue();
-			if(lp == prevLast) break;
-			prevLast = lp;
-			var siz  = cluster.getSource().getIOSize();
-			var move = moveReference(cluster, last.getPtr(), t -> t.withApproval(c -> c.getPtr().getValue()<siz), true);
-			if(move.isEmpty()) break;
+		debug("Compacting...");
+		try{
+			scanFreeChunks(FreeFoundAction.WARN_AND_LIST);
+			mergeChains();
+			mergeFreeRegions();
+			compact();
+			mergeFreeRegions();
+			evacuateBlockers();
+			compact();
+		}finally{
+			parent.invalidateRootCache();
 		}
 	}
-	private void optimizeFreeChunks(final Cluster cluster) throws IOException{
-		// traceCall();
-		wh:
+	
+	private void compact() throws IOException{
 		while(true){
-			
-			var frees = cluster.getMemoryManager().getFreeChunks();
-			iter:
-			for(var iter = frees.listIterator(frees.size()); iter.hasPrevious(); ){
-				var freeNext = iter.ioPrevious().dereference(cluster);
-				if(!iter.hasPrevious()) break;
-				var freeFirst = iter.ioPrevious().dereference(cluster);
-				iter.ioNext();
-				boolean surround = false;
-				
-				long sumMove = 0;
-				var  ch      = freeFirst;
-				for(int i = 0; i<16; i++){
-					ch = ch.nextPhysical();
-					if(ch == null) continue iter;
-					
-					sumMove += ch.totalSize();
-					if(sumMove>=256) break;
-					if(freeNext.getPtr().equals(ch.dataEnd())){
-						surround = true;
-						break;
-					}
-				}
-				if(!surround) continue;
-				
-				var firstNext = freeFirst.nextPhysical();
-				var limit     = firstNext.getPtr().getValue();
-				
-				var move = moveReference(cluster, firstNext.getPtr(), t -> t.withPositionMagnet(0).withApproval(c -> c.getPtr().getValue()<limit), true);
-				
-				if(move.hasAny()){
-					continue wh;
+			var chunks = new ArrayList<Chunk>();
+			for(var extent : new PhysicalExtentWalker(parent, parent.getFirstChunk().getPtr())){
+				if(extent instanceof Chunk chunk && chunk != parent.getFirstChunk()){
+					chunks.add(chunk);
 				}
 			}
-			
-			break;
+			boolean moved = false;
+			for(int i = chunks.size() - 1; i>=0; i--){
+				var chunk = chunks.get(i);
+				var move  = moveReference(parent, chunk.getPtr(), ticket -> ticket, true);
+				if(move.hasAny()){
+					moved = true;
+					break;
+				}
+			}
+			if(!moved) return;
 		}
-		
-		cluster.getMemoryManager().getFreeChunks().trim();
 	}
 	
-	//TODO: remove allowUnmanaged and introduce concept of unmanaged instance tracking to enable proper notification of movement
-	public static MoveBuffer moveReference(Cluster cluster, ChunkPointer toMove, Function<AllocateTicket, AllocateTicket> ticketFn, boolean allowUnmanaged) throws IOException{
-		{
-			var ch = toMove.dereference(cluster);
-			var ticket = AllocateTicket.bytes(ch.chainSize())
-			                           .withExplicitNextSize(Optional.of(ch.getNextSize()));
-			ticket = ticketFn.apply(ticket);
-			if(!ticket.canSubmit(cluster)){
-				return new MoveBuffer();
+	private void mergeFreeRegions() throws IOException{
+		var  maxChunks = ConfigDefs.DEFRAG_MERGE_MAX_CHUNKS.resolveVal();
+		long maxBytes  = ConfigDefs.DEFRAG_MERGE_MAX_BYTES.resolveVal();
+		while(true){
+			var     frees = parent.getMemoryManager().getFreeChunks();
+			boolean moved = false;
+			for(long k = 0; k<frees.size() - 1; k++){
+				var firstFree = FreeChunk.read(parent, frees.get(k));
+				var nextFree  = frees.get(k + 1);
+				
+				int     count   = 0;
+				long    bytes   = 0;
+				boolean reached = false;
+				for(long pos = firstFree.dataEnd(); pos<nextFree.getValue(); ){
+					if(count>=maxChunks || bytes>maxBytes) break;
+					var extent = PhysicalExtent.read(parent, ChunkPointer.of(pos));
+					bytes += extent.totalSize();
+					count++;
+					pos = extent.dataEnd();
+					if(pos == nextFree.getValue()) reached = true;
+				}
+				if(!reached || count == 0) continue;
+				
+				var move = moveReference(parent, ChunkPointer.of(firstFree.dataEnd()), ticket -> ticket, true);
+				if(move.hasAny()){
+					moved = true;
+					break;
+				}
+			}
+			if(!moved) return;
+		}
+	}
+	
+	private record Evac(ChunkPointer victim, long lo, long hi){ }
+	
+	private void evacuateBlockers() throws IOException{
+		var  maxChunks = ConfigDefs.DEFRAG_MERGE_MAX_CHUNKS.resolveVal();
+		long maxBytes  = ConfigDefs.DEFRAG_MERGE_MAX_BYTES.resolveVal();
+		var  evacs     = new ArrayList<Evac>();
+		
+		var frees = parent.getMemoryManager().getFreeChunks();
+		for(long k = 0; k<frees.size() - 1; k++){
+			var  firstFree = FreeChunk.read(parent, frees.get(k));
+			var  nextFree  = FreeChunk.read(parent, frees.get(k + 1));
+			long lo        = firstFree.getPtr().getValue();
+			long hi        = nextFree.dataEnd();
+			
+			var     gap     = new ArrayList<ChunkPointer>();
+			int     count   = 0;
+			long    bytes   = 0;
+			boolean reached = false;
+			for(long pos = firstFree.dataEnd(); pos<nextFree.getPtr().getValue(); ){
+				if(count>=maxChunks || bytes>maxBytes) break;
+				
+				var extent = PhysicalExtent.read(parent, ChunkPointer.of(pos));
+				
+				bytes += extent.totalSize();
+				count++;
+				
+				if(extent instanceof Chunk){
+					gap.add(extent.getPtr());
+				}
+				
+				pos = extent.dataEnd();
+				if(pos == nextFree.getPtr().getValue()){
+					reached = true;
+				}
+			}
+			if(reached){
+				for(var victim : gap){
+					evacs.add(new Evac(victim, lo, hi));
+				}
 			}
 		}
 		
-		List<Chunk> toFree = new ArrayList<>();
-		var record = new MemoryWalker.PointerRecord(){
-			MoveBuffer   move    = new MoveBuffer();
-			boolean      updated;
-			ChunkPointer destPtr = null;
-			@SuppressWarnings({"unchecked", "rawtypes"})
+		for(var evac : evacs){
+			try{
+				moveReference(parent, evac.victim(), ticket -> ticket.withApproval(candidate -> {
+					long pos = candidate.getPtr().getValue();
+					return pos<evac.lo() || pos>=evac.hi();
+				}));
+			}catch(RuntimeException failure){
+				if(!isTooSmall(failure)) throw failure;
+			}
+		}
+	}
+	
+	private void mergeChains() throws IOException{
+		for(var head : findFragmentedChainHeads()){
+			consolidateChain(head);
+		}
+	}
+	
+	private List<Chunk> findFragmentedChainHeads() throws IOException{
+		var pointedTo = new HashSet<ChunkPointer>();
+		var heads     = new ArrayList<Chunk>();
+		for(var extent : new PhysicalExtentWalker(parent, parent.getFirstChunk().getPtr())){
+			if(extent instanceof Chunk chunk && chunk.hasNextPtr()){
+				pointedTo.add(chunk.getNextPtr());
+				heads.add(chunk);
+			}
+		}
+		heads.removeIf(chunk -> pointedTo.contains(chunk.getPtr()));
+		return heads;
+	}
+	
+	private boolean consolidateChain(Chunk head) throws IOException{
+		var ticket = AllocateTicket.bytes(head.chainCapacity())
+		                           .withExplicitNextSize(Optional.empty())
+		                           .withDataPopulated((p, io) -> {
+			                           try(var old = head.io()){
+				                           io.setSize(old.getSize());
+				                           old.transferTo(io);
+				                           if(io.getSize() != io.getPos()) throw new IllegalStateException();
+			                           }
+		                           });
+		try(var transaction = parent.getSource().startTransaction()){
+			try{
+				var newChunk = ticket.submit(parent);
+				rewriteReferences(parent, head.getPtr(), newChunk.getPtr());
+			}catch(RuntimeException failure){
+				if(!isTooSmall(failure)) throw failure;
+				return false;
+			}
+			head.freeChaining();
+			transaction.commit();
+			return true;
+		}
+	}
+	
+	private static boolean isTooSmall(Throwable failure){
+		for(var e = failure; e != null; e = e.getCause()){
+			if(e instanceof VaryingSize.TooSmall) return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * Moves one physical chunk, without flattening its chain.
+	 * References to later chunks and offsets within the chain keep their existing meaning.
+	 */
+	public static MoveBuffer moveReference(Cluster cluster, ChunkPointer toMove, Function<AllocateTicket, AllocateTicket> ticketFn) throws IOException{
+		try{
+			return moveReference(cluster, toMove, ticketFn, false);
+		}finally{
+			cluster.invalidateRootCache();
+		}
+	}
+	
+	private static MoveBuffer moveReference(Cluster cluster, ChunkPointer toMove, Function<AllocateTicket, AllocateTicket> ticketFn, boolean earlier) throws IOException{
+		try(var transaction = cluster.getSource().startTransaction()){
+			var result = moveReference0(cluster, toMove, ticketFn, earlier);
+			transaction.commit();
+			return result;
+		}
+	}
+	
+	private static MoveBuffer moveReference0(Cluster cluster, ChunkPointer toMove, Function<AllocateTicket, AllocateTicket> ticketFn, boolean earlier) throws IOException{
+		if(toMove.equals(cluster.getFirstChunk().getPtr())) return new MoveBuffer();
+		var source  = toMove.dereference(cluster);
+		var manager = cluster.getMemoryManager();
+		var ticket = ticketFn.apply(
+			AllocateTicket.bytes(source.getCapacity())
+			              .withNext(source.getNextPtr())
+			              .withExplicitNextSize(Optional.of(source.getNextSize()))
+		);
+		
+		ticket = ticket.withApproval(candidate -> candidate.getCapacity()>=source.getCapacity() &&
+		                                          candidate.getNextPtr().equals(source.getNextPtr()));
+		
+		// The "all but the last chunks must be full" should be respected
+		if(source.hasNextPtr()){
+			ticket = ticket.withApproval(candidate -> candidate.getCapacity() == source.getCapacity());
+		}
+		
+		if(earlier && !manager.canAllocBefore(ticket, toMove)){
+			return new MoveBuffer();
+		}
+		
+		manager.checkCanFree(source);
+		boolean[] found = {false};
+		if(!earlier) cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> int log(
-				Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
-				var ptr = valueReference.getPtr();
-				if(!ptr.equals(toMove)){
-					return CONTINUE;
-				}
-				
-				var type = field.getType();
-				
-				if(IOInstance.isUnmanaged(type)){
-					if(allowUnmanaged){
-						move = reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance), ticketFn);
-					}else Log.trace("Disallowed move of unmanaged");
+			public <T extends IOInstance<T>> int log(Reference location, T instance, RefField<T, ?> field, Reference value, Holder holder){
+				if(value.getPtr().equals(toMove)){
+					found[0] = true;
 					return END;
 				}
-				
-				if(destPtr == null){
-					var   ch    = ptr.dereference(cluster);
-					Chunk newCh = copyCh(instanceReference, ch);
-					if(newCh == null){
-						return END;
-					}
-					ch.addChainTo(toFree);
-					destPtr = newCh.getPtr();
-					move = new MoveBuffer(toMove, destPtr);
-				}
-				
-				field.setReference(instance, Reference.of(destPtr, valueReference.getOffset()));
-				updated = true;
-				return END|SAVE;
-			}
-			private Chunk copyCh(Reference instanceReference, Chunk ch) throws IOException{
-				var ticket = AllocateTicket.bytes(ch.chainSize())
-				                           .withExplicitNextSize(Optional.of(ch.getNextSize()))
-				                           .withDataPopulated((p, dIo) -> {
-					                           ch.io(sIo -> sIo.transferTo(dIo));
-				                           });
-				ticket = ticketFn.apply(ticket);
-				if(ticket.positionMagnet().isEmpty()){
-					ticket = ticket.withPositionMagnet(instanceReference.calcGlobalOffset(cluster));
-				}
-				
-				//Open IO in order to lock the chunk and prevent it from being deallocated as a side effect
-				try(var ignored = ch.io()){
-					return ticket.submit(cluster);
-				}
+				return CONTINUE;
 			}
 			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(
-				Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder) throws IOException{
-				if(!value.equals(toMove)){
-					return CONTINUE;
+			public <T extends IOInstance<T>> int logChunkPointer(Reference location, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
+				if(value.equals(toMove)){
+					found[0] = true;
+					return END;
 				}
-				if(destPtr == null){
-					var ch    = value.dereference(cluster);
-					var newCh = copyCh(instanceReference, ch);
-					if(newCh == null) return END;
-					ch.addChainTo(toFree);
-					destPtr = newCh.getPtr();
-					move = new MoveBuffer(toMove, destPtr);
+				return CONTINUE;
+			}
+		}, false).walk();
+		if(!earlier && !found[0]) return new MoveBuffer();
+		
+		Chunk destination;
+		try(var pin = source.io()){
+			destination = earlier? manager.allocBefore(ticket, toMove) : ticket.submit(cluster);
+			if(destination == null){
+				return new MoveBuffer();
+			}
+			try{
+				// Read only this physical body, never the chain beyond it.
+				try(var input = cluster.getSource().ioAt(source.dataStart());
+				    var output = cluster.getSource().ioAt(destination.dataStart())){
+					
+					byte[] buffer    = new byte[(int)Math.min(8192, source.getSize())];
+					long   remaining = source.getSize();
+					while(remaining>0){
+						int count = (int)Math.min(buffer.length, remaining);
+						input.readFully(buffer, 0, count);
+						output.write(buffer, 0, count);
+						remaining -= count;
+					}
 				}
-				var newPtr = destPtr;
+				destination.setSize(source.getSize());
+				destination.syncStruct();
+			}catch(IOException|RuntimeException failure){
+				try{
+					manager.free(destination);
+				}catch(IOException|RuntimeException cleanup){
+					failure.addSuppressed(cleanup);
+				}
+				throw failure;
+			}
+		}
+		
+		rewriteReferences(cluster, toMove, destination.getPtr());
+		manager.free(source);
+		return new MoveBuffer(toMove, destination.getPtr());
+	}
+	
+	private static void rewriteReferences(Cluster cluster, ChunkPointer from, ChunkPointer to) throws IOException{
+		var record = new MemoryWalker.PointerRecord(){
+			boolean updated;
+			final Set<String> rewritten = new HashSet<>();
+			@Override
+			public <T extends IOInstance<T>> int log(Reference location, T instance, RefField<T, ?> field, Reference value, Holder holder) throws IOException{
+				var ptr = value.getPtr();
+				if(shouldBlockRewrite(location, ptr, field.getName())) return CONTINUE;
+				field.setReference(instance, Reference.of(to, value.getOffset()));
 				updated = true;
-				
+				return SAVE|END;
+			}
+			@Override
+			public <T extends IOInstance<T>> int logChunkPointer(Reference location, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder) throws IOException{
+				if(shouldBlockRewrite(location, value, field.getName())) return CONTINUE;
+				updated = true;
 				if(field.isReadOnly()){
-					holder.value = newPtr;
-					return END|HOLDER_COPY;
-				}else{
-					field.set(null, instance, newPtr);
-					return END|SAVE;
+					holder.value = to;
+					return HOLDER_COPY|END;
 				}
+				field.set(null, instance, to);
+				return SAVE|END;
+			}
+			private boolean shouldBlockRewrite(Reference location, ChunkPointer ptr, String name) throws IOException{
+				if(!ptr.equals(from) && !ptr.equals(to)){
+					return true;
+				}
+				var key = location + ":" + name;
+				if(!rewritten.add(key)){
+					if(ptr.equals(from)){
+						throw new IOException("Reference rewrite did not persist at " + key);
+					}
+					return true;
+				}
+				return false;
 			}
 		};
-		
-		// Restart after each save so traversal uses the updated references and destination data.
+		// Saving can change the containing object. Restart using persisted data;
+		// every pass updates another alias, including raw and chain-next pointers.
 		do{
 			record.updated = false;
 			cluster.rootWalker(record, false).walk();
 		}while(record.updated);
-		
-		cluster.getMemoryManager().free(toFree);
-		return record.move;
-	}
-	
-	private void reorder(final Cluster cluster) throws IOException{
-		boolean[] run = {true};
-		while(run[0]){
-			run[0] = false;
-			
-			List<Chunk> toFree = new ArrayList<>();
-			
-			cluster.rootWalker(new MemoryWalker.PointerRecord(){
-				@SuppressWarnings({"rawtypes", "unchecked"})
-				@Override
-				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
-					if(instance instanceof IOInstance.Unmanaged u){
-						var p    = u.getPointer();
-						var user = findReferenceUser(cluster, p.makeReference());
-						if(user.getPtr().compareTo(p)>0){
-							var move = reallocateUnmanaged(cluster, u, t -> t.withApproval(c -> c.getPtr().compareTo(user.getPtr())>0));
-							if(move.hasAny()) run[0] = true;
-							return CONTINUE;
-						}
-					}else{
-						boolean after = instanceReference.getPtr().compareTo(valueReference.getPtr())<0;
-						if(after) return CONTINUE;
-						
-						var type = field.getType();
-						
-						if(IOInstance.isUnmanaged(type)){
-							var move = reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance));
-							if(move.hasAny()) run[0] = true;
-							return END;
-						}
-						
-						run[0] = true;
-						
-						var ch = valueReference.getPtr().dereference(cluster);
-						ch.addChainTo(toFree);
-						
-						var newCh = AllocateTicket.withData((ObjectPipe)field.getReferencedPipe(instance), cluster, field.get(null, instance))
-						                          .withBytes(ch.getSize())
-						                          .withApproval(c -> c.getPtr().getValue()>instanceReference.getPtr().getValue())
-						                          .submit(cluster);
-						
-						field.setReference(instance, newCh.getPtr().makeReference());
-						if(toFree.size()>8){
-							return END|SAVE;
-						}
-						return CONTINUE|SAVE;
-					}
-					return CONTINUE;
-				}
-				@Override
-				public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
-					return CONTINUE;
-				}
-			}, false).walk();
-			
-			cluster.getMemoryManager().free(toFree);
-		}
-	}
-	
-	private void mergeChains(Cluster cluster) throws IOException{
-		// traceCall();
-		var startingChunk = cluster.getFirstChunk();
-		while(true){
-			Chunk fragmentedChunk;
-			{
-				var fragmentedChunkOpt = startingChunk.chunksAhead().skip(1).firstMatching(Chunk::hasNextPtr);
-				if(fragmentedChunkOpt.isEmpty()) break;
-				fragmentedChunk = fragmentedChunkOpt.get();
-				
-				startingChunk = fragmentedChunk;
-				
-				while(true){
-					var fptr  = fragmentedChunk.getPtr();
-					var chRef = startingChunk.chunksAhead().skip(1).firstMatching(c -> c.getNextPtr().equals(fptr));
-					if(chRef.isEmpty()) break;
-					fragmentedChunk = chRef.get();
-				}
-			}
-			
-			long requiredSize = fragmentedChunk.chainCapacity();
-			
-			reallocateAndMove(cluster, fragmentedChunk, requiredSize);
-			
-			var cached = startingChunk.getDataProvider().getChunkCached(startingChunk.getPtr());
-			if(cached != startingChunk){
-				startingChunk = cluster.getFirstChunk();
-			}
-		}
-	}
-	
-	private void reallocateAndMove(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
-		var likelyChain = fragmentedChunk.chainLength(3)>2;
-		var newChunk = AllocateTicket
-			               .bytes(requiredSize)
-			               .withDataPopulated((p, io) -> {
-				               try(var old = fragmentedChunk.io()){
-					               io.setSize(old.getSize());
-					               old.transferTo(io);
-					               if(io.getSize() != io.getPos()){
-						               throw new IllegalStateException();
-					               }
-				               }
-			               })
-			               .withExplicitNextSize(likelyChain? Optional.empty() : Optional.of(NumberSize.bySize(cluster.getSource().getIOSize())))
-			               .submit(cluster);
-		
-		var moved = moveChunkExact(cluster, fragmentedChunk.getPtr(), newChunk.getPtr());
-		if(moved){
-			fragmentedChunk.freeChaining();
-		}else{
-			Log.trace("Failed reallocate and move: {}#yellow", fragmentedChunk);
-		}
-	}
-	private void moveNextAndMerge(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
-		try(var ignored1 = cluster.getMemoryManager().openDefragmentMode()){
-			long createdCapacity = 0;
-			{
-				Chunk next = fragmentedChunk;
-				while(fragmentedChunk.getCapacity() + createdCapacity<requiredSize + fragmentedChunk.getHeaderSize() + 1){
-					next = next.nextPhysical();
-					if(next == null) throw new NotImplementedException("last but has next?");
-					
-					var frees = cluster.getMemoryManager().getFreeChunks();
-					
-					var freeIndex = frees.indexOf(next.getPtr());
-					if(freeIndex != -1){
-						frees.remove(freeIndex);
-					}else{
-						if(DEBUG_VALIDATION){
-							var chain = fragmentedChunk.collectNext();
-							if(chain.contains(next)){
-								throw new NotImplementedException("Special handling for already chained?");
-							}
-						}
-						
-						Chunk c = next;
-						var newChunk = AllocateTicket
-							               .bytes(next.getSize())
-							               .withNext(next.getNextPtr())
-							               .withDataPopulated((p, io) -> {
-								               byte[] data = p.getSource().read(c.dataStart(), Math.toIntExact(c.getSize()));
-								               io.write(data);
-							               })
-							               .submit(cluster);
-						
-						var moved = moveChunkExact(cluster, next.getPtr(), newChunk.getPtr());
-						if(!moved) throw new NotImplementedException();
-					}
-					
-					createdCapacity += next.totalSize();
-				}
-			}
-			
-			
-			var grow           = requiredSize - fragmentedChunk.getCapacity();
-			var remainingSpace = createdCapacity - grow;
-			
-			
-			var remainingData =
-				new ChunkBuilder(cluster, ChunkPointer.of(fragmentedChunk.dataStart() + requiredSize))
-					.withExplicitNextSize(NumberSize.bySize(cluster.getSource().getIOSize()))
-					.withCapacity(0)
-					.create();
-			
-			Chunk fragmentData;
-			try(var ignored = cluster.getSource().startTransaction()){
-				
-				if(!remainingData.setCapacityAndModifyNumSize(remainingSpace - remainingData.getHeaderSize())){
-					throw new AssertionError("Failed to set chunk size: " + remainingData);
-				}
-				
-				remainingData.writeHeader();
-				remainingData = cluster.getChunk(remainingData.getPtr());
-				
-				try{
-					fragmentedChunk.setCapacity(requiredSize);
-				}catch(OutOfBitDepth e){
-					throw new ShouldNeverHappenError("This should be guarded by the canFit check");
-				}
-				
-				fragmentData = Objects.requireNonNull(fragmentedChunk.next());
-				fragmentedChunk.clearNextPtr();
-				
-				try(var dest = fragmentedChunk.ioAt(fragmentedChunk.getSize());
-				    var src = fragmentData.io()){
-					src.transferTo(dest);
-				}
-				fragmentedChunk.syncStruct();
-				ignored.commit();
-			}
-			
-			fragmentData.freeChaining();
-			remainingData.freeChaining();
-		}
 	}
 	
 	private ChunkSet findFreeChunks(Cluster cluster) throws IOException{
-		var activeChunks       = new ChunkSet();
 		var unreferencedChunks = new ChunkSet();
 		var knownFree          = new ChunkSet(cluster.getMemoryManager().getFreeChunks());
-		
-		activeChunks.add(cluster.getFirstChunk());
-		unreferencedChunks.add(cluster.getFirstChunk());
-		
-		UnsafeConsumer<Chunk, IOException> pushChunk = chunk -> {
-			var ptr = chunk.getPtr();
-			if(activeChunks.min()>ptr.getValue()) return;
-			if(activeChunks.contains(ptr) && !unreferencedChunks.contains(ptr)) return;
-			
-			while(true){
-				if(activeChunks.isEmpty()) break;
-				
-				var last = activeChunks.last();
-				
-				if(last.compareTo(ptr)>=0){
-					break;
-				}
-				var next = last.dereference(cluster).nextPhysical();
-				if(next == null) break;
-				activeChunks.add(next);
-				if(next.getPtr().equals(ptr) || !knownFree.contains(next)){
-					unreferencedChunks.add(next);
-				}
+		var physicalFree       = new ChunkSet();
+		for(var extent : new PhysicalExtentWalker(cluster, cluster.getFirstChunk().getPtr())){
+			if(extent instanceof FreeChunk){
+				physicalFree.add(extent.getPtr());
+			}else{
+				unreferencedChunks.add(extent.getPtr());
 			}
-			
-			unreferencedChunks.remove(ptr);
-			if(activeChunks.trueSize()>1 && activeChunks.first().equals(ptr)){
-				activeChunks.removeFirst();
-			}
-			
-			var o = unreferencedChunks.optionalMin();
-			if(o.isEmpty() && activeChunks.trueSize()>1){
-				var last = activeChunks.last();
-				activeChunks.clear();
-				activeChunks.add(last);
-			}
-			
-			while(o.isPresent()){
-				var minPtr = o.getAsLong();
-				o = OptionalLong.empty();
-				while(activeChunks.trueSize()>1 && (ptr.equals(activeChunks.first()) || activeChunks.first().compareTo(minPtr)<0 || knownFree.contains(activeChunks.first()))){
-					activeChunks.removeFirst();
-				}
-			}
-		};
-		
+		}
+		// An orphan FreeChunk is a broken persistent chain, not an unreferenced
+		// live allocation. Never repair it by interpreting its bytes as a Chunk.
+		if(physicalFree.trueSize() != knownFree.trueSize() || !physicalFree.containsAll(knownFree)){
+			throw new MalformedFile("Physical free extents disagree with the persistent free chain");
+		}
 		cluster.rootWalker(MemoryWalker.PointerRecord.of(ref -> {
 			if(ref.isNull()) return;
-			for(Chunk chunk : ref.getPtr().dereference(cluster).collectNext()){
-				pushChunk.accept(chunk);
+			for(var chunk : ref.getPtr().dereference(cluster).collectNext()){
+				unreferencedChunks.remove(chunk.getPtr());
 			}
 		}), true).walk();
-		
 		return unreferencedChunks;
 	}
 	
@@ -518,129 +422,6 @@ public class DefragmentManager{
 			case WARN -> warn("found unknown free chunks: {}", unreferencedChunks);
 			case ERROR -> throw new MalformedFile("found unknown free chunks: " + unreferencedChunks);
 		}
-	}
-	
-	private boolean moveChunkExact(final Cluster cluster, ChunkPointer oldChunk, ChunkPointer newChunk) throws IOException{
-		
-		var rec = new MemoryWalker.PointerRecord(){
-			boolean moved;
-			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
-				if(valueReference.getPtr().equals(oldChunk)){
-					try{
-						field.setReference(instance, Reference.of(newChunk, valueReference.getOffset()));
-						moved = true;
-					}catch(VaryingSize.TooSmall ts){
-						return END;//TODO: create mechanism to notify parent to expand
-					}
-					return END|SAVE;
-				}
-				return CONTINUE;
-			}
-			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
-				if(value.equals(oldChunk)){
-					if(field.isReadOnly()){
-						holder.value = newChunk;
-						return END|HOLDER_COPY;
-					}
-					try{
-						field.set(null, instance, newChunk);
-						moved = true;
-					}catch(VaryingSize.TooSmall ts){
-						return END;
-					}
-					return END|SAVE;
-				}
-				return CONTINUE;
-			}
-		};
-		
-		cluster.rootWalker(rec, false).walk();
-		
-		return rec.moved;
-	}
-	
-	private <T extends IOInstance.Unmanaged<T>> MoveBuffer reallocateUnmanaged(Cluster cluster, T instance) throws IOException{
-		return reallocateUnmanaged(cluster, instance, t -> t.withApproval(c -> c.getPtr().compareTo(instance.getPointer())>0));
-	}
-	private static <T extends IOInstance.Unmanaged<T>> MoveBuffer reallocateUnmanaged(Cluster cluster, T instance, Function<AllocateTicket, AllocateTicket> ticketFn) throws IOException{
-		var oldPtr = instance.getPointer();
-		
-		var siz = oldPtr.dereference(cluster).chainSize();
-		
-		var ticket = AllocateTicket.bytes(siz)
-		                           .withDataPopulated((p, io) -> oldPtr.dereference(p).io(src -> src.transferTo(io)));
-		ticket = ticketFn.apply(ticket);
-		
-		var newCh = ticket.submit(cluster);
-		if(newCh == null) return new MoveBuffer();
-		var newPtr = newCh.getPtr();
-		var newRef = newPtr.makeReference();
-		
-		var ptrsToFree = moveReference(cluster, oldPtr.makeReference(), newRef);
-		instance.notifyReferenceMovement(newCh);
-		cluster.getMemoryManager().freeChains(ptrsToFree);
-		return new MoveBuffer(oldPtr, newPtr);
-	}
-	
-	private static Set<ChunkPointer> moveReference(final Cluster cluster, Reference oldRef, Reference newRef) throws IOException{
-		
-		boolean[]         found  = {false};
-		Set<ChunkPointer> toFree = new HashSet<>();
-		cluster.rootWalker(new MemoryWalker.PointerRecord(){
-			boolean foundCh;
-			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
-				var ptr = oldRef.getPtr();
-				if(valueReference.getPtr().equals(ptr)){
-					
-					if(toFree.contains(ptr)){
-						toFree.remove(ptr);
-					}else if(!foundCh){
-						toFree.add(ptr);
-						foundCh = true;
-					}
-				}
-				
-				if(valueReference.equals(oldRef)){
-					field.setReference(instance, newRef);
-					found[0] = true;
-					return SAVE|END;
-				}
-				return CONTINUE;
-			}
-			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
-				return CONTINUE;
-			}
-		}, false).walk();
-		if(!found[0]){
-			throw new IOException("Failed to find " + oldRef);
-		}
-		return toFree;
-	}
-	
-	private Reference findReferenceUser(final Cluster cluster, Reference ref) throws IOException{
-		Reference[] found = {null};
-		cluster.rootWalker(new MemoryWalker.PointerRecord(){
-			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder){
-				if(valueReference.equals(ref)){
-					found[0] = instanceReference;
-					return END;
-				}
-				return CONTINUE;
-			}
-			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
-				return CONTINUE;
-			}
-		}, false).walk();
-		if(found[0] == null){
-			throw new IOException("Failed to find ");
-		}
-		return found[0];
 	}
 	
 }

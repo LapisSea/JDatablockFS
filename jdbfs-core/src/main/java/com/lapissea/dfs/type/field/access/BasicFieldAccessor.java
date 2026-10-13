@@ -6,7 +6,6 @@ import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
-import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Annotation;
@@ -15,8 +14,6 @@ import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
-
-import static java.util.function.Function.identity;
 
 public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
 	
@@ -55,7 +52,17 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations){
-		this(declaringStruct, name, Iters.from(annotations).toMap(Annotation::annotationType, identity()));
+		this(declaringStruct, name, annotationMap(annotations));
+	}
+	private static Map<Class<? extends Annotation>, Annotation> annotationMap(Collection<Annotation> annotations){
+		Map.Entry<Class<? extends Annotation>, Annotation>[] res = new Map.Entry[annotations.size()];
+		
+		int i = 0;
+		for(Annotation a : annotations){
+			res[i++] = Map.entry(a.annotationType(), a);
+		}
+		
+		return Map.ofEntries(res);
 	}
 	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name,
 	                             Map<Class<? extends Annotation>, ? extends Annotation> annotations){

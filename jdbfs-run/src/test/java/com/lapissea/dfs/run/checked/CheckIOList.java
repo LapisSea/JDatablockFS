@@ -43,6 +43,10 @@ public class CheckIOList<T> implements IOList<T>{
 		}
 	}
 	
+	public void checkConsistency() throws IOException{
+		dataEquality();
+	}
+	
 	private <E extends Exception> void copyTestDataTo(UnsafeConsumer<T, E> dest) throws IOException, E{
 		var iter = testData.iterator();
 		while(iter.hasNext()){

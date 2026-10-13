@@ -211,8 +211,6 @@ public interface DataProvider{
 				DataProvider.this.refreshAfterRollback();
 			}
 			@Override
-			public DefragSes openDefragmentMode(){ return src().openDefragmentMode(); }
-			@Override
 			public IOList<ChunkPointer> getFreeChunks(){ return src().getFreeChunks(); }
 			@Override
 			public DataProvider getDataProvider(){ return this; }

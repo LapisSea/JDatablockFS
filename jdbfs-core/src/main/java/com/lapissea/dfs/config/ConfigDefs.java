@@ -97,6 +97,9 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	Flag.FInt ROOT_PROVIDER_WARMUP_COUNT = flagI("rootProviderWarmupCount", 20).positive();
 	
+	Flag.FInt DEFRAG_MERGE_MAX_CHUNKS = flagI("defrag.mergeMaxChunks", 16).positive();
+	Flag.FInt DEFRAG_MERGE_MAX_BYTES  = flagI("defrag.mergeMaxBytes", 4*1024).positive();
+	
 	private static int cores(){
 		return Math.min(10, Runtime.getRuntime().availableProcessors());
 	}

@@ -108,7 +108,7 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
  */
 @Struct.NoDefaultConstructor
 @StructPipe.Special
-public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
+public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>, PhysicalExtent{
 	
 	/**
 	 * Internal implementation of the {@link StandardStructPipe}. This may be removed in the future as the generated/generic pipes get further optimized
@@ -858,7 +858,20 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	@Nullable
 	public Chunk nextPhysical() throws IOException{
-		return checkLastPhysical()? null : provider.getChunk(ChunkPointer.of(dataEnd()));
+		long position = dataEnd();
+		
+		while(position<getSource().getIOSize()){
+			var extent = PhysicalExtent.read(provider, ChunkPointer.of(position));
+			if(extent instanceof Chunk chunk) return chunk;
+			position = extent.dataEnd();
+		}
+		
+		return null;
+	}
+	
+	@Nullable
+	public PhysicalExtent nextPhysicalExtent() throws IOException{
+		return checkLastPhysical()? null : PhysicalExtent.read(provider, ChunkPointer.of(dataEnd()));
 	}
 	
 	public boolean isNextPhysical(ChunkPointer other){

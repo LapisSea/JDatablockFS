@@ -2,6 +2,7 @@ package com.lapissea.dfs.run.repro;
 
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.FreeChunk;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import org.testng.annotations.DataProvider;
@@ -21,7 +22,7 @@ public class AdjacentFreeChunkGrowthTests{
 	public void growthIntoWideHeaderLeavesZeroedRemainderData(int growth) throws Exception{
 		var cluster = Cluster.emptyMem();
 		var manager = cluster.getMemoryManager();
-		// Seed free-list storage before freeing the adjacent chunk, keeping its layout stable.
+		// Keep a separate earlier hole to exercise the address index.
 		var seed = AllocateTicket.bytes(32).submit(cluster);
 		var target = AllocateTicket.bytes(64).submit(cluster);
 		var adjacent = AllocateTicket.bytes(200).submit(cluster);
@@ -37,9 +38,9 @@ public class AdjacentFreeChunkGrowthTests{
 		adjacent.writeHeader();
 		manager.free(adjacent);
 		long start = adjacent.getPtr().getValue();
-		int headerSize = adjacent.getHeaderSize();
-		assertThat(headerSize).isEqualTo(9);
-		assertThat(adjacent.isNextPhysical(tail)).isTrue();
+		var free = FreeChunk.read(cluster, adjacent.getPtr());
+		assertThat(free.totalSize()).isEqualTo(203);
+		assertThat(free.dataEnd()).isEqualTo(tail.getPtr().getValue());
 
 		target.growBy(target, growth);
 		assertThat(target.getCapacity()).isEqualTo(64 + growth);
@@ -50,16 +51,10 @@ public class AdjacentFreeChunkGrowthTests{
 			found |= freeList.get(i).equals(remainderPointer);
 		}
 		assertThat(found).as("remainder is registered as free").isTrue();
-		var remainder = remainderPointer.dereference(cluster);
-		assertThat(remainder.getHeaderSize()).isEqualTo(3);
-		assertThat(remainder.getCapacity()).isEqualTo(200 - growth);
-		assertThat(remainder.getSize()).isZero();
-		assertThat(remainder.isNextPhysical(tail)).isTrue();
+		var remainder = FreeChunk.read(cluster, remainderPointer);
+		assertThat(remainder.totalSize()).isEqualTo(203 - growth);
+		assertThat(remainder.dataEnd()).isEqualTo(tail.getPtr().getValue());
 		assertThat(cluster.getSource().read(start, growth)).as("newly allocated header bytes").containsOnly((byte)0);
-		int exposedHeaderBytes = headerSize - growth - remainder.getHeaderSize();
-		assertThat(exposedHeaderBytes).as("old header overlaps remainder data").isPositive();
-		assertThat(cluster.getSource().read(remainder.dataStart(), exposedHeaderBytes))
-			.as("old header bytes in remainder data").containsOnly((byte)0);
 	}
 
 	@Test
@@ -76,19 +71,17 @@ public class AdjacentFreeChunkGrowthTests{
 		assertThat(adjacent.isNextPhysical(next)).isTrue();
 		assertThat(next.isNextPhysical(tail)).isTrue();
 
-		// Merging crosses BYTE to SHORT; the larger header consumes two capacity bytes.
+		// Coalescing preserves the complete physical sizes of both former allocations.
 		manager.free(List.of(adjacent, next));
-		assertThat(adjacent.getHeaderSize()).isEqualTo(5);
-		assertThat(adjacent.getCapacity()).isEqualTo(255);
-		assertThat(adjacent.getBodyNumSize()).isEqualTo(NumberSize.SHORT);
+		var merged = FreeChunk.read(cluster, adjacent.getPtr());
+		assertThat(merged.totalSize()).isEqualTo(260);
+		assertThat(merged.dataEnd()).isEqualTo(tail.getPtr().getValue());
 		long start = adjacent.getPtr().getValue();
 		target.growBy(target, 1);
 		assertThat(target.getCapacity()).isEqualTo(65);
-		var remainder = ChunkPointer.of(start + 1).dereference(cluster);
-		assertThat(remainder.getHeaderSize()).isEqualTo(5);
-		assertThat(remainder.getCapacity()).isEqualTo(254);
-		assertThat(remainder.getSize()).isZero();
-		assertThat(remainder.isNextPhysical(tail)).isTrue();
+		var remainder = FreeChunk.read(cluster, ChunkPointer.of(start + 1));
+		assertThat(remainder.totalSize()).isEqualTo(259);
+		assertThat(remainder.dataEnd()).isEqualTo(tail.getPtr().getValue());
 		assertThat(cluster.getSource().read(start, 1)).as("absorbed header byte").containsOnly((byte)0);
 	}
 }

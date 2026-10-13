@@ -4,26 +4,36 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.core.chunk.FreeChunk;
+import com.lapissea.dfs.core.chunk.PhysicalExtentWalker;
+import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.FreeWhileUsed;
+import com.lapissea.dfs.objects.ChunkPointer;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Allocator operations must serialize free-list/header changes with physical-tail changes.
- * Approval callbacks pause allocation inside its critical section, before it writes headers.
+ * Independent allocator operations can progress while an allocation approval is paused.
+ * Extent reservations protect candidates without holding a global metadata lock.
  * These tests use independent raw chunks, avoiding concurrent mutation of the root collection.
  */
 public class MemoryManagerConcurrencyTests{
 	@Test(timeOut = 15_000)
-	public void optionalCompactionDoesNotWaitForOpenReaders() throws Exception{
+	public void freeDoesNotRelocateLiveChunksOrWaitForUnrelatedReaders() throws Exception{
 		var cluster = Cluster.emptyMem();
 		var memory  = cluster.getMemoryManager();
 		// Separated holes avoid merging; the larger hole precedes the physical tail.
@@ -45,9 +55,9 @@ public class MemoryManagerConcurrencyTests{
 			try{
 				memory.free(firstHole);
 				memory.free(lastHole);
-				assertThat(memory.getFreeChunks().size()).as("multiple holes permit optional compaction").isGreaterThan(1);
+				assertThat(memory.getFreeChunks().size()).as("separated holes remain available").isGreaterThan(1);
 				assertThat(memory.getFreeChunks().getLast()).isEqualTo(lastHole.getPtr());
-				assertThat(tail.checkLastPhysical()).as("compaction is deferred while a reader is open").isTrue();
+				assertThat(tail.checkLastPhysical()).as("ordinary free does not relocate live data").isTrue();
 			}finally{
 				freed.countDown();
 			}
@@ -128,7 +138,39 @@ public class MemoryManagerConcurrencyTests{
 		cluster.getMemoryManager().free(chunk);
 	}
 	@Test(timeOut = 15_000)
-	public void tailFreeWaitsForFreeChunkReuse() throws Exception{
+	public void reusedPinStacksPreserveOrderThreadAndManagerOwnership() throws Exception{
+		var cluster    = Cluster.emptyMem();
+		var other      = Cluster.emptyMem();
+		var memory     = cluster.getMemoryManager();
+		var chunk      = AllocateTicket.bytes(64).submit(cluster);
+		var otherChunk = AllocateTicket.bytes(64).submit(other);
+		for(int cycle = 0; cycle<3; cycle++){
+			try(var outer = chunk.io(); var unrelated = otherChunk.io()){
+				try(var nested = chunk.io()){
+					assertThatThrownBy(() -> memory.notifyEnd(outer)).isInstanceOf(IllegalStateException.class);
+					var failure = new AtomicReference<Throwable>();
+					var foreign = worker("foreign-pin-close", failure, () ->
+						                                                   assertThatThrownBy(() -> memory.notifyEnd(nested)).isInstanceOf(IllegalStateException.class));
+					foreign.start();
+					foreign.join(5_000);
+					assertThat(foreign.isAlive()).isFalse();
+					assertThat(failure.get()).isNull();
+				}
+				assertThatThrownBy(() -> memory.free(chunk)).isInstanceOf(FreeWhileUsed.class);
+				assertThatThrownBy(() -> other.getMemoryManager().free(otherChunk)).isInstanceOf(FreeWhileUsed.class);
+			}
+		}
+		memory.free(chunk);
+		other.getMemoryManager().free(otherChunk);
+		assertThatThrownBy(chunk::io).isInstanceOf(CacheOutOfSync.class);
+		var replacement = AllocateTicket.bytes(64).submit(cluster);
+		try(var ignored = replacement.io()){
+			assertThatThrownBy(() -> memory.free(replacement)).isInstanceOf(FreeWhileUsed.class);
+		}
+		memory.free(replacement);
+	}
+	@Test(timeOut = 15_000)
+	public void tailFreeProgressesDuringFreeChunkApproval() throws Exception{
 		var cluster   = Cluster.emptyMem();
 		var hole      = AllocateTicket.bytes(128).submit(cluster);
 		var separator = AllocateTicket.bytes(16).submit(cluster);
@@ -137,7 +179,7 @@ public class MemoryManagerConcurrencyTests{
 		assertThat(tail.checkLastPhysical()).isTrue();
 		assertThat(separator.isNextPhysical(tail)).isTrue();
 		var reused = new AtomicReference<Chunk>();
-		assertSerialized(
+		assertIndependentProgress(
 			gate -> reused.set(AllocateTicket.bytes(32).withApproval(candidate -> {
 				assertThat(candidate.getPtr().getValue()).isLessThan(separator.getPtr().getValue());
 				gate.pause();
@@ -150,14 +192,14 @@ public class MemoryManagerConcurrencyTests{
 	}
 	
 	@Test(timeOut = 15_000)
-	public void freeChunkReuseWaitsForAppend() throws Exception{
+	public void freeChunkReuseProgressesDuringAppendApproval() throws Exception{
 		var cluster   = Cluster.emptyMem();
 		var hole      = AllocateTicket.bytes(128).submit(cluster);
 		var separator = AllocateTicket.bytes(16).submit(cluster);
 		cluster.getMemoryManager().free(hole);
 		var appended = new AtomicReference<Chunk>();
 		var reused   = new AtomicReference<Chunk>();
-		assertSerialized(
+		assertIndependentProgress(
 			gate -> appended.set(AllocateTicket.bytes(256).withApproval(candidate -> {
 				assertThat(candidate.getPtr().getValue()).isEqualTo(separator.dataEnd());
 				gate.pause();
@@ -170,9 +212,94 @@ public class MemoryManagerConcurrencyTests{
 		cluster.getChunk(reused.get().getPtr());
 	}
 	
+	@Test(timeOut = 15_000)
+	public void rejectedApprovalReleasesExtentAndCoalescesConcurrentNeighborFrees() throws Exception{
+		var cluster = Cluster.emptyMem();
+		var before  = AllocateTicket.bytes(32).submit(cluster);
+		var hole    = AllocateTicket.bytes(128).submit(cluster);
+		var after   = AllocateTicket.bytes(32).submit(cluster);
+		var guard   = AllocateTicket.bytes(32).submit(cluster);
+		cluster.getMemoryManager().free(hole);
+		var result = new AtomicReference<Chunk>();
+		var paused = new AtomicBoolean();
+		assertIndependentProgress(gate -> result.set(AllocateTicket.bytes(16).withApproval(candidate -> {
+			if(paused.compareAndSet(false, true)) gate.pause();
+			return false;
+		}).submit(cluster)), () -> cluster.getMemoryManager().free(List.of(before, after)));
+		assertThat(result.get()).isNull();
+		var merged = FreeChunk.read(cluster, before.getPtr());
+		assertThat(merged.dataEnd()).isEqualTo(guard.getPtr().getValue());
+		assertThat(cluster.getMemoryManager().getFreeChunks().size()).isEqualTo(1);
+		IntrusiveAllocatorTests.assertFreeChain(cluster);
+	}
+	
+	@Test(timeOut = 15_000)
+	public void rejectedApprovalReleasesAndTrimsExtentThatBecamePhysicalTail() throws Exception{
+		var cluster = Cluster.emptyMem();
+		var hole    = AllocateTicket.bytes(128).submit(cluster);
+		var tail    = AllocateTicket.bytes(32).submit(cluster);
+		cluster.getMemoryManager().free(hole);
+		var paused = new AtomicBoolean();
+		assertIndependentProgress(gate -> {
+			assertThat(AllocateTicket.bytes(16).withApproval(candidate -> {
+				if(paused.compareAndSet(false, true)) gate.pause();
+				return false;
+			}).submit(cluster)).isNull();
+		}, () -> cluster.getMemoryManager().free(tail));
+		assertThat(cluster.getSource().getIOSize()).isEqualTo(hole.getPtr().getValue());
+		assertThat(cluster.getMemoryManager().getFreeChunks().isEmpty()).isTrue();
+		IntrusiveAllocatorTests.assertFreeChain(cluster);
+	}
+	
+	@Test(timeOut = 30_000)
+	public void concurrentAllocationsAndFreesPreservePayloadsAndPhysicalBoundaries() throws Exception{
+		var cluster = Cluster.emptyMem();
+		var start   = new CountDownLatch(1);
+		try(var pool = Executors.newFixedThreadPool(4)){
+			var futures = new ArrayList<Future<?>>();
+			for(int worker = 0; worker<4; worker++){
+				int id = worker;
+				futures.add(pool.submit(() -> {
+					try{
+						assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
+						for(int iteration = 0; iteration<80; iteration++){
+							byte marker = (byte)(id*43 + iteration);
+							int  size   = 9 + (id*13 + iteration*17)%190;
+							var chunk = AllocateTicket.bytes(size)
+							                          .withDataPopulated((p, io) -> {
+								                          byte[] bytes = new byte[size];
+								                          Arrays.fill(bytes, marker);
+								                          io.write(bytes);
+							                          }).submit(cluster);
+							try(var io = chunk.io()){
+								byte[] bytes = new byte[size];
+								io.readFully(bytes);
+								assertThat(bytes).containsOnly(marker);
+							}
+							cluster.getMemoryManager().free(chunk);
+						}
+					}catch(Exception e){ throw new RuntimeException(e); }
+				}));
+			}
+			start.countDown();
+			for(var future : futures) future.get(20, TimeUnit.SECONDS);
+		}
+		long end          = cluster.getFirstChunk().getPtr().getValue();
+		var  physicalFree = new HashSet<ChunkPointer>();
+		for(var extent : new PhysicalExtentWalker(cluster, cluster.getFirstChunk().getPtr())){
+			assertThat(extent.getPtr().getValue()).isEqualTo(end);
+			if(extent instanceof FreeChunk) physicalFree.add(extent.getPtr());
+			end = extent.dataEnd();
+		}
+		assertThat(end).isEqualTo(cluster.getSource().getIOSize());
+		assertThat(cluster.getMemoryManager().getFreeChunks()).containsExactlyInAnyOrderElementsOf(physicalFree);
+	}
+	
+	@FunctionalInterface
 	private interface Action{
 		void run() throws Exception;
 	}
+	
 	
 	private interface PausedAction{
 		void run(Gate gate) throws Exception;
@@ -192,7 +319,7 @@ public class MemoryManagerConcurrencyTests{
 		}
 	}
 	
-	private static void assertSerialized(PausedAction first, Action second) throws Exception{
+	private static void assertIndependentProgress(PausedAction first, Action second) throws Exception{
 		var    gate          = new Gate();
 		var    error         = new AtomicReference<Throwable>();
 		var    secondStarted = new CountDownLatch(1);
@@ -207,8 +334,8 @@ public class MemoryManagerConcurrencyTests{
 			assertThat(gate.entered.await(5, TimeUnit.SECONDS)).as("allocation reached approval callback").isTrue();
 			contender.start();
 			assertThat(secondStarted.await(2, TimeUnit.SECONDS)).isTrue();
-			assertThat(secondDone.await(300, TimeUnit.MILLISECONDS))
-				.as("competing allocator operation must wait until the paused allocation releases its lock").isFalse();
+			assertThat(secondDone.await(3, TimeUnit.SECONDS))
+				.as("independent allocator operation completes while approval remains paused").isTrue();
 		}finally{
 			gate.release.countDown();
 			owner.join(3_000);

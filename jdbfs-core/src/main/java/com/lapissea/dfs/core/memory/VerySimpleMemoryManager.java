@@ -61,13 +61,6 @@ public class VerySimpleMemoryManager
 	}
 	
 	@Override
-	public DefragSes openDefragmentMode(){
-		context.checkValid();
-		boolean oldDefrag = defragmentMode;
-		defragmentMode = true;
-		return () -> defragmentMode = oldDefrag;
-	}
-	@Override
 	public IOList<ChunkPointer> getFreeChunks(){
 		context.checkValid();
 		try{

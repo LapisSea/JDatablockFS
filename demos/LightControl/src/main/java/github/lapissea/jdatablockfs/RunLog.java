@@ -2,6 +2,7 @@ package github.lapissea.jdatablockfs;
 
 import com.google.gson.GsonBuilder;
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.FreeChunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.ChunkPointer;
@@ -240,7 +241,7 @@ public final class RunLog{
 	private static void log(Cluster cluster, IOList<LightStamp> stamps) throws IOException{
 		long sum = 0;
 		for(ChunkPointer freeChunk : cluster.getMemoryManager().getFreeChunks()){
-			sum += freeChunk.dereference(cluster).getCapacity();
+			sum += FreeChunk.read(cluster, freeChunk).totalSize();
 		}
 		
 		LogUtil.println("Record count: " + stamps.size() + "," +

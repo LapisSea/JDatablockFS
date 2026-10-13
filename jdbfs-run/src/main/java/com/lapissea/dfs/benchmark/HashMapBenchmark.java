@@ -1,21 +1,25 @@
 package com.lapissea.dfs.benchmark;
 
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.utils.RawRandom;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OperationsPerInvocation;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
@@ -25,6 +29,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
@@ -36,6 +41,72 @@ import java.util.stream.IntStream;
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class HashMapBenchmark{
+
+	/** Constant occupancy exercises the actual BucketEntry/IONode allocation path. */
+	@State(Scope.Thread)
+	public static class NodeChurn{
+		private static final int SIZE = 1024;
+		private static final Integer VALUE = 42;
+		private final Integer[] keys = new Integer[SIZE];
+		private Cluster cluster;
+		private IOMap<Integer, Integer> map;
+		private int position;
+		private long initialSize;
+
+		@Setup(Level.Trial)
+		public void setup() throws IOException{
+			cluster = Cluster.emptyMem();
+			map = cluster.roots().request(1, HashIOMap.class, Integer.class, Integer.class);
+			for(int i = 0; i<SIZE; i++){
+				keys[i] = i;
+				map.put(keys[i], VALUE);
+			}
+			// Complete incremental resizing before the measured replacements.
+			for(int i = 0; i<SIZE*2; i++) map.put(keys[i%SIZE], VALUE);
+			var random = new Random(69);
+			for(int i = SIZE - 1; i>0; i--){
+				int j = random.nextInt(i + 1);
+				var key = keys[i];
+				keys[i] = keys[j];
+				keys[j] = key;
+			}
+			var guard = AllocateTicket.bytes(64<<10).submit(cluster);
+			guard.setSize(guard.getCapacity());
+			guard.syncStruct();
+			initialSize = cluster.getSource().getIOSize();
+		}
+
+		@TearDown(Level.Trial)
+		public void checkData() throws IOException{
+			if(map.size() != SIZE) throw new IllegalStateException("Map occupancy changed");
+			for(var key : keys){
+				if(!VALUE.equals(map.get(key))) throw new IllegalStateException("Map value changed for " + key);
+			}
+			if(cluster.getSource().getIOSize()>initialSize + (1<<20)){
+				throw new IllegalStateException("Map benchmark working set grew without bound");
+			}
+		}
+	}
+
+	/** Time per remove/reinsert pair, including node reclamation and initialization. */
+	@Benchmark
+	@BenchmarkMode(Mode.AverageTime)
+	@OutputTimeUnit(TimeUnit.NANOSECONDS)
+	@Warmup(iterations = 3, time = 1)
+	@Measurement(iterations = 5, time = 1)
+	@Fork(2)
+	@OperationsPerInvocation(MemoryManagementBenchmark.BATCH)
+	public int recycleNodes(NodeChurn state) throws IOException{
+		int removed = 0;
+		for(int i = 0; i<MemoryManagementBenchmark.BATCH; i++){
+			var key = state.keys[state.position];
+			state.position = (state.position + 1)&(NodeChurn.SIZE - 1);
+			if(state.map.remove(key)) removed++;
+			state.map.put(key, NodeChurn.VALUE);
+		}
+		if(removed != MemoryManagementBenchmark.BATCH) throw new IllegalStateException("Replacement failed to remove existing keys");
+		return removed;
+	}
 	
 	public static void main(String[] args) throws Exception{
 		var opt  = new OptionsBuilder().include(HashMapBenchmark.class.getSimpleName());

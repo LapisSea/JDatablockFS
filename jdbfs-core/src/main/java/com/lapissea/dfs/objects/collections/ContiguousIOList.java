@@ -129,7 +129,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		storage = makeValueStorage(VaryingSize.Provider.record((max, ptr, id) -> max.min(varyingBuffer.get(id))), IOType.getArg(getTypeDef(), 0));
 		calcHead();
 	}
-
+	
 	private void calcHead(){
 		headSize = (int)calcInstanceSize(WordSpace.BYTE);
 	}
@@ -365,17 +365,31 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	}
 	
 	private void writeAt(long index, T value) throws IOException{
-		try(var io = ioAtElement(index)){
-			storage.write(io, value);
-		}catch(VaryingSize.TooSmall e){
-			growVaryingSizes(e.tooSmallIdMap);
+		writeAt(index, value, size());
+	}
+	private void writeAt(long index, T value, long layoutCount) throws IOException{
+		while(true){
 			try(var io = ioAtElement(index)){
 				storage.write(io, value);
+				return;
+			}catch(VaryingSize.TooSmall e){
+				// Widening the list can move the next value allocation beyond another pointer width boundary.
+				// Retry while declared widths make progress
+				Map<VaryingSize, NumberSize> increases = new HashMap<>();
+				for(var entry : e.tooSmallIdMap.entrySet()){
+					int id = entry.getKey().id;
+					if(id<0 || id>=varyingBuffer.size()) throw e;
+					if(entry.getValue().greaterThan(varyingBuffer.get(id))){
+						increases.put(entry.getKey(), entry.getValue());
+					}
+				}
+				if(increases.isEmpty()) throw e;
+				growVaryingSizes(increases, layoutCount);
 			}
 		}
 	}
 	
-	private <Inline> void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap) throws IOException{
+	private <Inline> void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap, long layoutCount) throws IOException{
 		var newBuffer = new ArrayList<>(varyingBuffer);
 		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.id, s));
 		var newVarying = List.copyOf(newBuffer);
@@ -392,7 +406,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var newElemenSize = newVal.inlineSize();
 		var headSiz       = calcInstanceSize(WordSpace.BYTE);
 		
-		long newSize = headSiz + size()*newElemenSize;
+		long newSize = headSiz + layoutCount*newElemenSize;
 		
 		Inline            zeroSize       = null;
 		Map<Long, Inline> forwardBackup  = new HashMap<>();
@@ -407,7 +421,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			
 			try(var io = RangeIO.of(getPointer().dereference(getDataProvider()), headSiz, Long.MAX_VALUE)){
 				
-				for(long i = 0; i<size(); i++){
+				for(long i = 0; i<layoutCount; i++){
 					var newDataStart = i*newElemenSize;
 					var newDataEnd   = newDataStart + newElemenSize;
 					
@@ -418,7 +432,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 							forwardCounter++;
 						}
 					}else{
-						while(forwardCounter*oldElemenSize<newDataEnd && forwardCounter<size()){
+						while(forwardCounter*oldElemenSize<newDataEnd && forwardCounter<layoutCount){
 							io.setPos(forwardCounter*oldElemenSize);
 							forwardBackup.put(forwardCounter, oldVal.readInline(io));
 							forwardCounter++;
@@ -486,8 +500,11 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		}
 		
 		try(var ignored = getDataProvider().getSource().startTransaction()){
+			// Trigger any VaryingSize widening while the layout is still unshifted. TooSmall retry inside writeAt
+			// assumes coherent state, not mid insertion
+			writeAt(size(), value);
 			forwardDup(index);
-			writeAt(index, value);
+			writeAt(index, value, size() + 1);
 			deltaSize(1);
 			ignored.commit();
 		}
@@ -516,6 +533,10 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		
 		defragData(count);
 		
+		long                         tooSmallAt       = -1;
+		Map<VaryingSize, NumberSize> tooSmallIdMap    = null;
+		List<T>                      bufferedElements = new ArrayList<>();
+		
 		try(var io = selfIO()){
 			var pos = calcElementOffset(size());
 			io.skipExact(pos);
@@ -524,7 +545,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			io.ensureCapacity(totalPos);
 			
 			long targetBytes = Math.min(BATCH_BYTES, elSiz*count);
-			long targetCount = elSiz == 0? count : Math.min(count, Math.max(1, targetBytes/elSiz));
+			long targetCount = elSiz == 0? count : Math.clamp(targetBytes/elSiz, 1, count);
 			
 			var targetCap = targetCount*elSiz;
 			
@@ -533,13 +554,15 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 				UnsafeLongConsumer<IOException> flush = change -> {
 					mem.transferTo(io);
 					deltaSize(change);
+					// TODO: Very bad design bug fixed!! Need to rework this hazard...
+					// CursorRandomIO.getPos() clamps to size, but writes use the raw cursor
+					// Resetting just the size leaves the cursor stale, so the next write lands at the old offset and regrows
 					buffIo.setSize(0);
+					buffIo.setPos(0);
 				};
 				
 				long lastI = 0;
 				long i     = 0;
-				
-				List<T> bufferedElements = new ArrayList<>();
 				
 				for(long c = 0; c<count; c++){
 					T value = source.get();
@@ -550,13 +573,9 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 					}catch(VaryingSize.TooSmall e){
 						var change = i - lastI;
 						if(change>0) flush.accept(change);
-						
-						growVaryingSizes(e.tooSmallIdMap);
-						
-						addAll(bufferedElements.subList((int)change, bufferedElements.size()));
-						addMany(count - c - 1, source);
-						
-						return;
+						tooSmallAt = c;
+						tooSmallIdMap = e.tooSmallIdMap;
+						break;
 					}
 					
 					i++;
@@ -569,11 +588,19 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 					}
 				}
 				
-				if(buffIo.getPos()>0){
+				if(tooSmallAt<0 && buffIo.getPos()>0){
 					var change = i - lastI;
 					flush.accept(change);
 				}
 			}
+		}
+		
+		if(tooSmallAt>=0){
+			// Rewrites the entire list and may relocate or free chain chunks, runs outside loop to handle chain invalidation
+			growVaryingSizes(tooSmallIdMap, size());
+			
+			add(bufferedElements.getLast());
+			addMany(count - tooSmallAt - 1, source);
 		}
 	}
 	
@@ -631,8 +658,6 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	}
 	
 	private void forwardDup(long index) throws IOException{
-		// 0-byte elements all sit at headSize (calcElementOffset = headSize + size*index), so there is
-		// no data to shift; skipping also avoids BATCH_BYTES/elementSize dividing by zero.
 		if(getElementSize() == 0) return;
 		try(var io = selfIO()){
 			var  size              = size();
@@ -658,6 +683,16 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 				var nextPos = calcElementOffset(i + 1);
 				io.setPos(nextPos);
 				io.write(buff, 0, buffSize);
+			}
+			
+			if(storage.needsRemoval()){
+				// The shift leaves a stale copy of the original slot at index. Reference storages update the object a slot already points to
+				// in place, so that leftover reference would make the following write mutate the live object now owned by slot index+1
+				// (observed as two references pointing to one address). Null the stale slot via notifyRemoval - but do NOT
+				// free the returned pointer, the shifted copy owns the object now.
+				// (Writes exactly at EOF cannot hit this: storage write treats remaining()==0 as null)
+				io.setPos(calcElementOffset(index));
+				storage.notifyRemoval((RandomIO)io, true);
 			}
 		}
 	}
@@ -776,7 +811,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 				var freeSpace       = last.getCapacity() - last.getSize();
 				var newLastCapacity = last.getCapacity() - freeSpace;
 				if(freeSpace>=Chunk.minSafeSize() && newLastCapacity>=Chunk.minSafeSize()){
-					var ptr      = ChunkPointer.of(last.dataEnd() - freeSpace);
+					var ptr = ChunkPointer.of(last.dataEnd() - freeSpace);
 					
 					var builder  = new ChunkBuilder(getDataProvider(), ptr).withCapacity(freeSpace);
 					var tmpSplit = builder.create();

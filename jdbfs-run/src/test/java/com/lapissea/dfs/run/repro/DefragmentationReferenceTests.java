@@ -1,5 +1,7 @@
 package com.lapissea.dfs.run.repro;
 
+import com.lapissea.dfs.run.TestUtils;
+
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DefragmentManager;
@@ -93,7 +95,7 @@ public class DefragmentationReferenceTests{
 				return SAVE|END;
 			}
 		}, false).walk();
-		var before = Cluster.initOrOpen(cluster.getSource()).roots().request("duo", Duo.class);
+		var before = TestUtils.reopenMem(cluster).roots().request("duo", Duo.class);
 		assertThat(refA.getReference(before)).isEqualTo(Reference.of(C.getPtr(), first*k));
 		assertThat(refB.getReference(before)).isEqualTo(Reference.of(C.getPtr(), second*k));
 
@@ -102,7 +104,7 @@ public class DefragmentationReferenceTests{
 		assertThat(Reference.of(C.getPtr(), second*k).readNew(cluster, payloadPipe, null).value)
 		               .as("second payload before the move").isEqualTo(222L);
 
-		MoveBuffer move = DefragmentManager.moveReference(cluster, C.getPtr(), t -> t, true);
+		MoveBuffer move = DefragmentManager.moveReference(cluster, C.getPtr(), t -> t);
 		assertThat(move.hasAny()).as("chunk C must actually be moved by moveReference").isTrue();
 		var newC = move.toDest(C.getPtr()).orElseThrow();
 
@@ -128,7 +130,7 @@ public class DefragmentationReferenceTests{
 		assertThat(bRef.readNew(cluster, payloadPipe, null).value)
 		               .as("b should still be the original payload 222, not the sentinel in reused memory")
 		               .isEqualTo(222L);
-		var reopened = Cluster.initOrOpen(cluster.getSource());
+		var reopened = TestUtils.reopenMem(cluster);
 		var restored = reopened.roots().request("duo", Duo.class);
 		assertThat(restored.a.value).isEqualTo(111L);
 		assertThat(restored.b.value).isEqualTo(222L);

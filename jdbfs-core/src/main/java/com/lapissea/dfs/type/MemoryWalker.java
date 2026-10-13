@@ -732,7 +732,10 @@ public class MemoryWalker{
 			if(inlinedParent){
 				return SAVE|END;
 			}
-			if(instance instanceof IOInstance.Unmanaged<?>){
+			if(instance instanceof IOInstance.Unmanaged<?> && !pipe.getSpecificFields().contains(field)){
+				// Dynamic unmanaged fields persist through their accessor. Declared
+				// managed fields still need serialization, including changes nested
+				// inside an inline managed value (for example HashIOMap.BucketSet).
 				field.set(ioPool, instance, fieldValue);
 			}else{
 				instanceReference.write(provider, false, pipe, instance);

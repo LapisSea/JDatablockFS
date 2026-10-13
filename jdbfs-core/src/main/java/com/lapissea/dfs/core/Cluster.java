@@ -6,6 +6,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkCache;
+import com.lapissea.dfs.core.chunk.PhysicalExtentWalker;
 import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
 import com.lapissea.dfs.exceptions.MalformedClusterData;
@@ -15,11 +16,11 @@ import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.collections.HashIOMap;
-import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.objects.collections.UnmanagedIOMap;
 import com.lapissea.dfs.type.IOInstance;
@@ -60,9 +61,9 @@ import static com.lapissea.dfs.type.field.annotations.IOValue.Reference.PipeType
 public final class Cluster implements DataProvider{
 	
 	public enum Version{
-		INDEV(0, 1), V1_0;
+		INDEV(0, 1), V1_0, V1_1;
 		
-		public static final Version CURRENT = INDEV;
+		public static final Version CURRENT = V1_1;
 		
 		public final short major, minor;
 		
@@ -192,22 +193,18 @@ public final class Cluster implements DataProvider{
 		private Metadata metadata;
 	}
 	
-	@IOInstance.StrFormat(name = false, curly = false, fNames = false)
-	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
-		ChunkPointer getVal();
-	}
-	
 	@IOValue
-	@IONullability(NULLABLE)
 	@SuppressWarnings("unused")
 	private static class Metadata extends IOInstance.Managed<Metadata>{
 		
 		@IOValue.OverrideType(value = HashIOMap.class)
+		@IONullability(NULLABLE)
 		private UnmanagedIOMap<ObjectID, Object> rootObjects;
 		
+		@IONullability(NULLABLE)
 		private IOTypeDB.PersistentDB db;
 		
-		private IOList<IOChunkPointer> freeChunks;
+		private long firstFreeChunk;
 		
 		@Override
 		public String toString(){
@@ -217,7 +214,7 @@ public final class Cluster implements DataProvider{
 		public String toShortString(){
 			if(db == null) return IOFieldTools.UNINITIALIZED_FIELD_SIGN;
 			return "{db: " + db.toShortString() + ", " +
-			       freeChunks.size() + " freeChunks, " +
+			       "firstFreeChunk: " + firstFreeChunk + ", " +
 			       "rootObjects: " + Iters.from(rootObjects).joinAsStr(", ", "[", "]", e -> e.getKey().toString())
 			       + "}";
 		}
@@ -331,16 +328,24 @@ public final class Cluster implements DataProvider{
 		root = rp.readNew(this, ch, null);
 		metadata = root.metadata;
 		
-		memoryManager = new PersistentMemoryManager(
-			this,
-			metadata.freeChunks
-				.mappedView(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class))
-				.cachedView(128, 128)
-		);
+		memoryManager = new PersistentMemoryManager(this, getFirstFreeChunkPointer(), this::setFirstFreeChunkPointer);
 		
 		source.getUnmanagedRegistry().registerProvider(this);
 		if(GlobalConfig.TYPE_VALIDATION){
 			scanTypeDB();
+		}
+	}
+	
+	public ChunkPointer getFirstFreeChunkPointer(){
+		return ChunkPointer.of(metadata.firstFreeChunk);
+	}
+	private void setFirstFreeChunkPointer(ChunkPointer pointer) throws IOException{
+		var pipe      = StandardStructPipe.of(Metadata.class);
+		var field     = pipe.getSpecificFields().requireExact(long.class, "firstFreeChunk");
+		var reference = rootPipe().getSpecificFields().requireExact(Reference.class, "metadata:ref").get(null, root);
+		metadata.firstFreeChunk = pointer.getValue();
+		try(var io = reference.io(this)){
+			pipe.writeSingleField(this, io, field, metadata);
 		}
 	}
 	
@@ -412,45 +417,13 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
-	private Chunk lastWalkedChunkCache;
-	
 	@Override
 	public Chunk walkToLastChunk() throws IOException{
-		Chunk ch = null;
-		{
-			Chunk last = lastWalkedChunkCache;
-			if(last != null){
-				if(getChunkCached(last.getPtr()) == last){
-					ch = last;
-				}
-			}
+		Chunk last = null;
+		for(var extent : new PhysicalExtentWalker(this, firstChunkPtr())){
+			if(extent instanceof Chunk chunk) last = chunk;
 		}
-		if(ch == null){
-			ch = getFirstChunk();
-		}
-		while(true){
-			Chunk next;
-			try{
-				next = ch.nextPhysical();
-			}catch(MalformedPointer e){
-				next = null;
-				for(long pos = ch.dataEnd() + 1, end = getSource().getIOSize(); pos<end; pos++){
-					var ptr = ChunkPointer.of(pos);
-					if(Chunk.isChunkValidAt(this, ptr)){
-						next = getChunk(ptr);
-						if(next.dataEnd()>end) next = null;
-						else break;
-					}
-				}
-				if(next == null){
-					return lastWalkedChunkCache = ch;
-				}
-			}
-			if(next == null){
-				return lastWalkedChunkCache = ch;
-			}
-			ch = next;
-		}
+		return last;
 	}
 	
 	@Override
@@ -460,6 +433,10 @@ public final class Cluster implements DataProvider{
 	public void refreshAfterRollback() throws IOException{
 		((Roots)roots).cacheClear();
 		metadata.db.clearCaches();
+		// The allocator free-chain root lives in a managed metadata field, so the rollback of the
+		// backing bytes does not restore the in-memory value. Re-read it before the allocator reloads.
+		var fresh = rootPipe().readNew(this, getFirstChunk(), null);
+		metadata.firstFreeChunk = fresh.metadata.firstFreeChunk;
 		memoryManager.refreshAfterRollback();
 	}
 	
@@ -532,13 +509,15 @@ public final class Cluster implements DataProvider{
 			ref.getPtr().dereference(this).addChainToPtr(referenced);
 		}), true).walk();
 		
-		for(Chunk chunk : getFirstChunk().chunksAhead()){
-			if(referenced.contains(chunk.getPtr())){
-				usefulBytes += chunk.getSize();
-				usedChunkCapacity += chunk.getCapacity();
-			}
+		for(var extent : new PhysicalExtentWalker(this, firstChunkPtr())){
 			chunkCount++;
-			if(chunk.hasNextPtr()) hasNextCount++;
+			if(extent instanceof Chunk chunk){
+				if(referenced.contains(chunk.getPtr())){
+					usefulBytes += chunk.getSize();
+					usedChunkCapacity += chunk.getCapacity();
+				}
+				if(chunk.hasNextPtr()) hasNextCount++;
+			}
 		}
 		
 		return new ChunkStatistics(
@@ -562,6 +541,11 @@ public final class Cluster implements DataProvider{
 	
 	public void defragment() throws IOException{
 		new DefragmentManager(this).defragment();
+	}
+	
+	void invalidateRootCache(){
+		var cache = ((Roots)roots).cache;
+		if(cache != null) cache.clear();
 	}
 	
 	public void scanGarbage(DefragmentManager.FreeFoundAction action) throws IOException{

@@ -1,497 +1,771 @@
 package com.lapissea.dfs.core.memory;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.core.DefragmentManager;
 import com.lapissea.dfs.core.MemoryManager;
 import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkBuilder;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.core.chunk.FreeChunk;
+import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.FreeWhileUsed;
-import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.objects.Wrapper;
+import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.objects.collections.listtools.IOListCached;
-import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.iterableplus.IterablePPSource;
-import com.lapissea.iterableplus.Iters;
-import com.lapissea.iterableplus.Match;
-import com.lapissea.iterableplus.OptionalPP;
-import com.lapissea.util.UtilL;
+import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public final class PersistentMemoryManager
-	extends MemoryManager.StrategyImpl<PersistentMemoryManager.AllocStrategy, PersistentMemoryManager.AllocToStrategy>{
+import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
+
+public final class PersistentMemoryManager implements MemoryManager{
+	private static final int SEARCH_LIMIT = 32;
 	
-	protected enum AllocStrategy{
-		REUSE_FREE_CHUNKS,
-		APPEND_TO_FILE
+	private static final class Entry{
+		volatile FreeChunk free;
+		boolean claimed;
+		Entry(FreeChunk free){ this.free = free; }
+		long address()       { return free.getPtr().getValue(); }
 	}
 	
-	protected enum AllocToStrategy{
-		GROW_FILE_ALLOC,
-		GROW_FREE_ALLOC,
-		SIMPLE_NEXT_ASSIGN,
-		CHAIN_WALK_UP_DEFRAGMENT,
-		GROWING_HEADER_NEXT_ASSIGN,
-	}
+	private static final Comparator<Entry> SIZE_ORDER = Comparator.comparingLong((Entry e) -> {
+		return e.free.totalSize();
+	}).thenComparingLong(Entry::address);
 	
-	private final List<ChunkPointer>   queuedFreeChunks   = new ArrayList<>();
-	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
+	private final Cluster                                   context;
+	private final UnsafeConsumer<ChunkPointer, IOException> saveRoot;
 	
-	private final IOList<ChunkPointer> freeChunks;
-	// Free-list edits can recursively allocate/free storage, so all layout changes share one reentrant lock.
-	private final Lock                 allocationLock = new ReentrantLock();
-	private       boolean              defragmentMode;
+	private final ReentrantLock   metadataLock = new ReentrantLock();
+	private final ReentrantLock   tailLock     = new ReentrantLock();
+	private final ReentrantLock[] chainLocks   = new ReentrantLock[64];
 	
-	private boolean adding, allowFreeRemove = true;
+	private final NavigableMap<Long, Entry>                  byAddress   = new TreeMap<>();
+	private final NavigableMap<Integer, NavigableSet<Entry>> bySize      = new TreeMap<>();
+	private final Map<Thread, ArrayDeque<ChunkChainIO>>      openChains  = new IdentityHashMap<>();
+	private final ThreadLocal<ArrayDeque<ChunkChainIO>>      chainStacks = ThreadLocal.withInitial(ArrayDeque::new);
 	
-	private static final class Node extends AbstractList<ChunkChainIO> implements IterablePPSource<ChunkChainIO>{
-		private       ChunkChainIO[] data = new ChunkChainIO[1];
-		private       int            size;
-		private final Thread         thread;
-		private Node(Thread thread){ this.thread = thread; }
-		@Override
-		public boolean add(ChunkChainIO v){
-			var d = data;
-			var s = size;
-			if(d.length == s){
-				data = d = Arrays.copyOf(d, d.length*2);
-			}
-			d[s] = v;
-			size = s + 1;
-			return true;
+	private ChunkPointer head;
+	private long         lastChipped;
+	private long         physicalEnd;
+	
+	private IOException publicationFailure;
+	
+	public PersistentMemoryManager(Cluster context, ChunkPointer head, UnsafeConsumer<ChunkPointer, IOException> saveRoot) throws IOException{
+		this.context = context;
+		this.head = head;
+		this.saveRoot = saveRoot;
+		physicalEnd = context.getSource().getIOSize();
+		
+		for(int i = 0; i<chainLocks.length; i++){
+			chainLocks[i] = new ReentrantLock();
 		}
-		@Override
-		public ChunkChainIO get(int index){ return data[index]; }
-		private ChunkChainIO pop(){
-			var d = data;
-			var s = size - 1;
-			if(s<0){
-				return null;
+		
+		reload();
+	}
+	
+	private void reload() throws IOException{
+		var source = context.getSource();
+		
+		byAddress.clear();
+		bySize.clear();
+		
+		var seen = new HashSet<ChunkPointer>();
+		for(var ptr = head; !ptr.isNull(); ){
+			if(!seen.add(ptr)){
+				throw new IOException("Cycle in free chain at " + ptr);
 			}
+			var free     = FreeChunk.read(source, ptr);
+			var previous = byAddress.lowerEntry(ptr.getValue());
+			var next     = byAddress.ceilingEntry(ptr.getValue());
 			
-			var old = d[s];
-			d[s] = null;
-			size = s;
-			return old;
+			if(previous != null && previous.getValue().free.dataEnd()>ptr.getValue() ||
+			   next != null && free.dataEnd()>next.getKey()){
+				throw new IOException("Overlapping free extents at " + ptr);
+			}
+			index(new Entry(free));
+			ptr = free.nextPtr();
 		}
 		
-		@Override
-		public int size(){ return size; }
-		@Override
-		public OptionalInt tryGetSize(){ return OptionalInt.of(size); }
-	}
-	
-	
-	private final ThreadLocal<Node> stacks    = new ThreadLocal<>();
-	private final Map<Thread, Node> allStacks = new HashMap<>();
-	private       Node              last;
-	
-	private Node getStack(){
-		var th = Thread.currentThread();
-		var l  = last;
-		if(l != null && l.thread == th){
-			return l;
+		// The persistent chain is in address order, can use index
+		var expected = byAddress.isEmpty()? ChunkPointer.NULL : byAddress.firstEntry().getValue().free.getPtr();
+		if(!head.equals(expected)){
+			throw new IOException("Unsorted free chain root");
 		}
 		
-		var s = stacks.get();
-		if(s == null){
-			s = new Node(th);
-			registerNode(th, s);
+		for(var e : byAddress.values()){
+			var next    = byAddress.higherEntry(e.address());
+			var nextPtr = next == null? ChunkPointer.NULL : next.getValue().free.getPtr();
+			if(!e.free.nextPtr().equals(nextPtr)){
+				throw new IOException("Unsorted free chain at " + e.free.getPtr());
+			}
 		}
-		return last = s;
-	}
-	
-	private void registerNode(Thread th, Node s){
-		stacks.set(s);
-		synchronized(allStacks){
-			cleanupStacks();
-			allStacks.put(th, s);
-		}
-	}
-	private void cleanupStacks(){
-		if(allStacks.isEmpty()) return;
-		allStacks.keySet().removeIf(e -> !e.isAlive());
 	}
 	
 	@Override
-	public void notifyStart(ChunkChainIO chain){
-		try(var ioAccess = context.getSource().lockIO()){
-			context.checkValid();
-			allocationLock.lock();
-			try{
-				getStack().add(chain);
-			}finally{
-				allocationLock.unlock();
+	public void refreshAfterRollback() throws IOException{
+		metadataLock.lock();
+		try{
+			head = context.getFirstFreeChunkPointer();
+			physicalEnd = context.getSource().getIOSize();
+			publicationFailure = null;
+			lastChipped = 0;
+			reload();
+		}finally{
+			metadataLock.unlock();
+		}
+	}
+	
+	@Override
+	public DataProvider getDataProvider(){ return context; }
+	private static int sizeGroup(long size){ return 63 - Long.numberOfLeadingZeros(size); }
+	private void index(Entry e){
+		byAddress.put(e.address(), e);
+		indexSize(e);
+	}
+	private void indexSize(Entry e){
+		if(!e.claimed){
+			bySize.computeIfAbsent(sizeGroup(e.free.totalSize()), k -> new TreeSet<>(SIZE_ORDER)).add(e);
+		}
+	}
+	
+	private void unindexSize(Entry e){
+		var group = bySize.get(sizeGroup(e.free.totalSize()));
+		if(group == null) return;
+		group.remove(e);
+		if(group.isEmpty()){
+			bySize.remove(sizeGroup(e.free.totalSize()));
+		}
+	}
+	
+	private void checkHealthy() throws IOException{
+		if(publicationFailure != null){
+			throw new IOException("Allocator is unusable after a publication failure", publicationFailure);
+		}
+	}
+	private void poison(Throwable failure){
+		if(publicationFailure == null){
+			publicationFailure = failure instanceof IOException io? io : new IOException("Allocator publication failed", failure);
+		}
+	}
+	
+	private void setHead(ChunkPointer ptr) throws IOException{
+		saveRoot.accept(ptr);
+		head = ptr;
+	}
+	
+	private void replace(Entry e, FreeChunk free) throws IOException{
+		boolean changedSize = !e.claimed && e.free.totalSize() != free.totalSize();
+		if(changedSize) unindexSize(e);
+		free.write(context);
+		e.free = free;
+		if(changedSize) indexSize(e);
+	}
+	
+	private void unlink(Entry e) throws IOException{
+		var prev = byAddress.lowerEntry(e.address());
+		if(prev == null){
+			setHead(e.free.nextPtr());
+		}else{
+			replace(prev.getValue(), new FreeChunk(prev.getValue().free.getPtr(), prev.getValue().free.totalSize(), e.free.nextPtr()));
+		}
+		
+		if(!e.claimed) unindexSize(e);
+		byAddress.remove(e.address());
+		
+		if(lastChipped == e.address()) lastChipped = 0;
+	}
+	
+	private Entry insert(long address, long size) throws IOException{ return insert(address, size, false); }
+	private Entry insert(long address, long size, boolean claimed) throws IOException{
+		var next = byAddress.ceilingEntry(address);
+		var prev = byAddress.lowerEntry(address);
+		var ptr  = ChunkPointer.of(address);
+		var e    = new Entry(new FreeChunk(ptr, size, next == null? ChunkPointer.NULL : next.getValue().free.getPtr()));
+		e.claimed = claimed;
+		e.free.write(context);
+		if(prev == null) setHead(ptr);
+		else replace(prev.getValue(), new FreeChunk(prev.getValue().free.getPtr(), prev.getValue().free.totalSize(), ptr));
+		index(e);
+		return coalesce(e);
+	}
+	
+	private Entry coalesce(Entry e) throws IOException{
+		if(e.claimed) return e;
+		var prev = byAddress.lowerEntry(e.address());
+		if(prev != null && !prev.getValue().claimed && prev.getValue().free.dataEnd() == e.address()){
+			var p = prev.getValue();
+			unlink(e);
+			replace(p, new FreeChunk(p.free.getPtr(), Math.addExact(p.free.totalSize(), e.free.totalSize()), p.free.nextPtr()));
+			e = p;
+		}
+		var next = byAddress.higherEntry(e.address());
+		if(next != null && !next.getValue().claimed && e.free.dataEnd() == next.getKey()){
+			var n = next.getValue();
+			unlink(n);
+			replace(e, new FreeChunk(e.free.getPtr(), Math.addExact(e.free.totalSize(), n.free.totalSize()), e.free.nextPtr()));
+		}
+		return e;
+	}
+	
+	private void release(Entry e) throws IOException{
+		e.claimed = false;
+		indexSize(e);
+		coalesce(e);
+	}
+	
+	private Entry claim(AllocateTicket ticket, long required, Set<Long> tried, boolean earliest, long after, long before){
+		if(earliest){
+			if(after>=before) return null;
+			for(var e : byAddress.subMap(after, false, before, false).values()){
+				if(e.claimed || e.free.totalSize()<required) continue;
+				e.claimed = true;
+				unindexSize(e);
+				return e;
 			}
+			return null;
+		}
+		
+		var hint = lastChipped == 0? null : byAddress.get(lastChipped);
+		if(hint != null && !hint.claimed && hint.free.totalSize()>=required && (tried == null || !tried.contains(hint.address()))){
+			hint.claimed = true;
+			unindexSize(hint);
+			return hint;
+		}
+		
+		if(bySize.isEmpty()){
+			return null;
+		}
+		
+		var lowerBound = new Entry(new FreeChunk(ChunkPointer.of(1), required, ChunkPointer.NULL));
+		for(var group : bySize.tailMap(sizeGroup(required), true).values()){
+			Entry best         = null;
+			long  bestDistance = Long.MAX_VALUE;
+			int   inspected    = 0;
+			// Exact sizes within each logarithmic group skip undersized extents without scanning.
+			for(var e : group.tailSet(lowerBound, true)){
+				if(tried != null && tried.contains(e.address())) continue;
+				if(++inspected>SEARCH_LIMIT) break;
+				
+				if(ticket.positionMagnet().isEmpty()){
+					best = e;
+					break;
+				}
+				
+				long magnet   = ticket.positionMagnet().getAsLong();
+				long distance = e.address()>=magnet? e.address() - magnet : magnet - e.address();
+				if(best == null || distance<bestDistance){
+					best = e;
+					bestDistance = distance;
+				}
+			}
+			if(best == null) continue;
+			best.claimed = true;
+			unindexSize(best);
+			return best;
+		}
+		return null;
+	}
+	
+	private Chunk splitCandidate(Entry e, AllocateTicket ticket, boolean fromStart){
+		var  template  = new ChunkBuilder(context, e.free.getPtr(), ticket).ensureMinSize().create();
+		long remaining = e.free.totalSize() - template.totalSize();
+		if(remaining>=Chunk.minSafeSize()){
+			if(fromStart) return template;
+			return new ChunkBuilder(context, ChunkPointer.of(e.free.dataEnd() - template.totalSize()), ticket).ensureMinSize().create();
+		}
+		// Consume a small remainder as spare capacity, preserving the entire physical extent.
+		for(var width : NumberSize.values()){
+			long capacity = e.free.totalSize() - (1 + width.bytes*2 + ticket.calcNextSize().bytes);
+			if(capacity<ticket.bytes() || !width.canFit(capacity)) continue;
+			return new ChunkBuilder(context, e.free.getPtr(), ticket).withExplicitBodyNumSize(width).withCapacity(capacity).create();
+		}
+		return null;
+	}
+	
+	private Chunk reuse(AllocateTicket ticket, boolean dryRun) throws IOException{ return reuse(ticket, dryRun, false, Long.MAX_VALUE); }
+	private Chunk reuse(AllocateTicket ticket, boolean dryRun, boolean earliest, long before) throws IOException{
+		context.checkValid();
+		long required = new ChunkBuilder(context, ticket.next().isNull()? ChunkPointer.of(1) : ChunkPointer.NULL, ticket)
+			                .ensureMinSize()
+			                .create()
+			                .totalSize();
+		Set<Long> tried = null;
+		long      after = 0;
+		for(int attempt = 0; earliest || attempt<SEARCH_LIMIT; attempt++){
+			Entry e;
+			metadataLock.lock();
+			try{
+				checkHealthy();
+				e = claim(ticket, required, tried, earliest, after, before);
+			}finally{ metadataLock.unlock(); }
+			
+			if(e == null) return null;
+			after = e.address();
+			boolean consumed = false;
+			try{
+				var candidate = splitCandidate(e, ticket, earliest);
+				if(candidate == null || !ticket.approve(candidate)){
+					// Successful first attempts need no retry bookkeeping. Earliest
+					// selection already advances monotonically through addresses.
+					if(!earliest){
+						if(tried == null) tried = new HashSet<>();
+						tried.add(e.address());
+					}
+					continue;
+				}
+				if(dryRun){
+					return candidate;
+				}
+				
+				try(var ignored = context.getSource().lockIO()){
+					metadataLock.lock();
+					
+					try(var transaction = context.getSource().openIOTransaction()){
+						checkHealthy();
+						
+						long remaining = e.free.totalSize() - candidate.totalSize();
+						if(remaining == 0){
+							unlink(e);
+						}else if(earliest){
+							unlink(e);
+							var remainder = insert(candidate.dataEnd(), remaining);
+							lastChipped = remainder.address();
+						}else{
+							replace(e, new FreeChunk(e.free.getPtr(), remaining, e.free.nextPtr()));
+							e.claimed = false;
+							indexSize(e);
+							var remainder = coalesce(e);
+							lastChipped = remainder.address();
+						}
+						
+						candidate.writeHeader();
+						context.getChunkCache().add(candidate);
+						
+						transaction.commit();
+						consumed = true;
+					}catch(IOException|RuntimeException failure){
+						poison(failure);
+						throw failure;
+					}finally{ metadataLock.unlock(); }
+				}
+				
+				zero(candidate.dataStart(), candidate.getCapacity());
+				return candidate;
+			}finally{
+				if(!consumed){
+					try(var ignored = context.getSource().lockIO()){
+						boolean ownsTail = tailLock.tryLock();
+						metadataLock.lock();
+						try(var transaction = context.getSource().openIOTransaction()){
+							
+							if(publicationFailure == null){
+								release(e);
+								if(ownsTail) trimTail();
+							}
+							
+							transaction.commit();
+						}catch(IOException|RuntimeException failure){
+							poison(failure);
+							throw failure;
+						}finally{
+							metadataLock.unlock();
+							if(ownsTail) tailLock.unlock();
+						}
+					}
+				}
+			}
+		}
+		return null;
+	}
+	private Chunk append(AllocateTicket ticket, boolean dryRun) throws IOException{
+		context.checkValid();
+		while(true){
+			long end   = physicalEnd;
+			var  chunk = new ChunkBuilder(context, ChunkPointer.of(end), ticket).ensureMinSize().create();
+			if(!ticket.approve(chunk)){
+				return null;
+			}
+			
+			boolean retry = false;
+			try(var ignored = context.getSource().lockIO()){
+				tailLock.lock();
+				metadataLock.lock();
+				try{
+					checkHealthy();
+					
+					// Approval may perform nested allocations or frees on this same thread
+					if(end != physicalEnd){
+						retry = true;
+					}else if(dryRun){
+						return chunk;
+					}else{
+						try(var transaction = context.getSource().openIOTransaction()){
+							if(context.getSource().getIOSize()<physicalEnd){
+								throw new IOException("File truncated outside allocator");
+							}
+							
+							chunk.writeHeader();
+							
+							try(var io = context.getSource().io()){
+								if(chunk.getCapacity()>0){
+									io.setPos(chunk.dataEnd() - 1).writeInt1(0);
+								}
+								io.setCapacity(chunk.dataEnd());
+							}
+							
+							context.getChunkCache().add(chunk);
+							physicalEnd = chunk.dataEnd();
+							
+							transaction.commit();
+						}
+					}
+				}catch(IOException|RuntimeException failure){
+					poison(failure);
+					throw failure;
+				}finally{
+					metadataLock.unlock();
+					tailLock.unlock();
+				}
+			}
+			if(retry) continue;
+			
+			zero(chunk.dataStart(), chunk.getCapacity());
+			return chunk;
+		}
+	}
+	
+	private void zero(long start, long size) throws IOException{
+		if(size == 0) return;
+		try(var io = context.getSource().ioAt(start)){
+			IOUtils.zeroFill(io, size);
+		}
+	}
+	
+	@Override
+	public Chunk alloc(AllocateTicket ticket) throws IOException{
+		Chunk chunk = reuse(ticket, false);
+		if(chunk == null){
+			chunk = append(ticket, false);
+		}
+		
+		return populateChunk(ticket, chunk);
+	}
+	@Override
+	public Chunk allocBefore(AllocateTicket ticket, ChunkPointer before) throws IOException{
+		var chunk = reuse(ticket.withApproval(candidate -> {
+			return candidate.dataEnd()<=before.getValue();
+		}), false, true, before.getValue());
+		
+		return populateChunk(ticket, chunk);
+	}
+	private Chunk populateChunk(AllocateTicket ticket, Chunk chunk) throws IOException{
+		if(chunk == null) return null;
+		
+		context.getSource().openIOTransaction(() -> {
+			context.getUnmanagedRegistry().allocated(chunk.getPtr());
+			if(ticket.dataPopulator() != null) ticket.dataPopulator().accept(chunk);
+		});
+		return chunk;
+	}
+	
+	@Override
+	public boolean canAllocBefore(AllocateTicket ticket, ChunkPointer before) throws IOException{
+		return reuse(ticket.withApproval(candidate -> {
+			return candidate.dataEnd()<=before.getValue();
+		}), true, true, before.getValue()) != null;
+	}
+	@Override
+	public boolean canAlloc(AllocateTicket ticket) throws IOException{
+		return reuse(ticket, true) != null || append(ticket, true) != null;
+	}
+	
+	@Override
+	public void allocTo(Chunk first, Chunk target, long toAllocate) throws IOException{
+		if(toAllocate<0){
+			throw new IllegalArgumentException();
+		}
+		
+		try(var ignored = context.getSource().lockIO()){
+			context.checkValid();
+			
+			var lock = chainLocks[(int)((first.getPtr().getValue() >>> 3)&(chainLocks.length - 1))];
+			lock.lock();
+			try{
+				while(toAllocate>0){
+					target = target.last();
+					
+					long added;
+					tailLock.lock();
+					metadataLock.lock();
+					try(var transaction = context.getSource().openIOTransaction()){
+						checkHealthy();
+						
+						added = MemoryOperations.growFileAlloc(target, toAllocate);
+						if(added>0){
+							physicalEnd = target.dataEnd();
+						}
+						if(added == 0){
+							added = growAdjacent(target, toAllocate);
+						}
+						
+						transaction.commit();
+					}catch(IOException|RuntimeException failure){
+						poison(failure);
+						throw failure;
+					}finally{
+						metadataLock.unlock();
+						tailLock.unlock();
+					}
+					
+					if(added == 0) added = MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate);
+					if(added == 0) added = MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate);
+					if(added == 0) added = MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate);
+					if(added<=0){
+						throw new IOException("Cannot extend " + target + " by " + toAllocate);
+					}
+					
+					toAllocate -= added;
+				}
+			}finally{
+				lock.unlock();
+			}
+		}
+	}
+	private long growAdjacent(Chunk target, long requested) throws IOException{
+		var e = byAddress.get(target.dataEnd());
+		if(e == null || e.claimed){
+			return 0;
+		}
+		
+		long available = target.getBodyNumSize().remaining(target.getCapacity());
+		long take      = Math.min(Math.min(requested, available), e.free.totalSize());
+		if(take<=0){
+			return 0;
+		}
+		
+		long remaining = e.free.totalSize() - take;
+		if(remaining>0 && remaining<Chunk.minSafeSize()){
+			if(available>=e.free.totalSize()){
+				take = e.free.totalSize();
+				remaining = 0;
+			}else{
+				take = e.free.totalSize() - Chunk.minSafeSize();
+				remaining = Chunk.minSafeSize();
+				if(take<=0) return 0;
+			}
+		}
+		
+		long start = e.address();
+		unlink(e);
+		zero(start, take);
+		
+		if(remaining>0){
+			insert(start + take, remaining);
+		}
+		try{
+			target.setCapacity(target.getCapacity() + take);
+		}catch(OutOfBitDepth impossible){
+			throw new ShouldNeverHappenError(impossible);
+		}
+		target.syncStruct();
+		return take;
+	}
+	
+	@Override
+	public IOList<ChunkPointer> getFreeChunks(){
+		try(var ignored = context.getSource().lockIO()){
+			context.checkValid();
+			metadataLock.lock();
+			try{
+				return IOList.wrap(List.copyOf(byAddress.values().stream().map(e -> e.free.getPtr()).toList()));
+			}finally{ metadataLock.unlock(); }
+		}
+	}
+	@Override
+	public void notifyStart(ChunkChainIO chain){
+		try(var ignored = context.getSource().lockIO()){
+			context.checkValid();
+			metadataLock.lock();
+			try{
+				if(DEBUG_VALIDATION) try{
+					chain.head.requireReal();
+				}catch(CacheOutOfSync freed){
+					throw new IllegalStateException("Opening a freed chunk", freed);
+				}
+				
+				var thread = Thread.currentThread();
+				var stack  = openChains.get(thread);
+				if(stack == null){
+					stack = chainStacks.get();
+					openChains.put(thread, stack);
+				}
+				stack.push(chain);
+			}finally{ metadataLock.unlock(); }
 		}
 	}
 	@Override
 	public void notifyEnd(ChunkChainIO chain){
-		try(var ioAccess = context.getSource().lockIO()){
+		try(var ignored = context.getSource().lockIO()){
 			context.checkValid();
-			allocationLock.lock();
+			metadataLock.lock();
 			try{
-				var s  = getStack();
-				var ch = s.pop();
-				if(ch != chain){
-					failNotifyEnd(s, ch, chain);
+				var stack = openChains.get(Thread.currentThread());
+				if(stack == null || stack.isEmpty()){
+					throw new IllegalStateException("There is nothing that should have ended!");
 				}
-			}finally{
-				allocationLock.unlock();
-			}
+				
+				if(stack.peek() != chain){
+					int ahead = 0;
+					for(var opened : stack){
+						if(opened == chain)
+							throw new IllegalStateException("Chain is closed in wrong order! There is " + ahead + " open chains ahead!");
+						ahead++;
+					}
+					throw new IllegalStateException("Chain was already closed!");
+				}
+				stack.pop();
+				if(stack.isEmpty()){
+					openChains.remove(Thread.currentThread());
+				}
+			}finally{ metadataLock.unlock(); }
 		}
 	}
-	private static void failNotifyEnd(Node stack, ChunkChainIO popped, ChunkChainIO chain){
-		if(popped == null){
-			throw new IllegalStateException("There is nothing that should have ended!");
-		}
-		
-		if(stack.enumerated().firstMatchingM(e -> e.val() == chain) instanceof Match.Some(var found)){
-			var count = stack.size() - found.index();
-			stack.add(popped);
-			throw new IllegalStateException("Chain is closed in wrong order! There is " + count + " open chains ahead!");
-		}
-		
-		stack.add(popped);
-		throw new IllegalStateException("Chain was already closed!");
-	}
-	
-	public void refreshAfterRollback(){
-		queuedFreeChunks.clear();
-		if(freeChunks instanceof IOListCached<?> cached){
-			cached.clearCache();
-		}
-	}
-	
-	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
-		super(context, AllocStrategy.class.getEnumConstants(), AllocToStrategy.class.getEnumConstants());
-		this.freeChunks = freeChunks;
-	}
-	
 	@Override
-	protected Chunk alloc(AllocStrategy strategy, DataProvider ctx, AllocateTicket ticket, boolean dryRun) throws IOException{
-		try(var ioAccess = context.getSource().lockIO()){
+	public void checkCanFree(Chunk chunk) throws IOException{
+		try(var ignored = context.getSource().lockIO()){
 			context.checkValid();
-			allocationLock.lock();
+			metadataLock.lock();
 			try{
-				return switch(strategy){
-					case REUSE_FREE_CHUNKS -> defragmentMode? null : MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
-					case APPEND_TO_FILE -> MemoryOperations.allocateAppendToFile(ctx, ticket, dryRun);
-				};
-			}finally{
-				allocationLock.unlock();
-			}
-		}
-	}
-	@Override
-	protected long allocTo(AllocToStrategy strategy, Chunk first, Chunk target, long toAllocate) throws IOException{
-		try(var ioAccess = context.getSource().lockIO()){
-			context.checkValid();
-			allocationLock.lock();
-			try{
-				return switch(strategy){
-					case GROW_FILE_ALLOC -> MemoryOperations.growFileAlloc(target, toAllocate);
-					case GROW_FREE_ALLOC -> MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove);
-					case SIMPLE_NEXT_ASSIGN -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate);
-					case CHAIN_WALK_UP_DEFRAGMENT -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate);
-					case GROWING_HEADER_NEXT_ASSIGN -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate);
-				};
-			}finally{
-				allocationLock.unlock();
-			}
+				checkHealthy();
+				chunk.requireReal();
+				assertNotOpen(chunk);
+			}finally{ metadataLock.unlock(); }
 		}
 	}
 	
-	@Override
-	public DefragSes openDefragmentMode(){
-		context.checkValid();
-		boolean oldDefrag = defragmentMode;
-		defragmentMode = true;
-		return () -> defragmentMode = oldDefrag;
-	}
-	@Override
-	public IOList<ChunkPointer> getFreeChunks(){
-		context.checkValid();
-		return adding? queuedFreeChunksIO : freeChunks;
-	}
-	
-	private void addQueue(Collection<Chunk> ptrs){
-		synchronized(queuedFreeChunksIO){
-			if(ptrs.size()<=2){
-				for(Chunk ptr : ptrs){
-					UtilL.addRemainSorted(queuedFreeChunks, ptr.getPtr());
-				}
-			}else{
-				for(Chunk ptr : ptrs){
-					queuedFreeChunks.add(ptr.getPtr());
-				}
-				queuedFreeChunks.sort(Comparator.naturalOrder());
-			}
-		}
-	}
-	private List<Chunk> popQueue() throws IOException{
-		synchronized(queuedFreeChunksIO){
-			var chs = new ArrayList<Chunk>(queuedFreeChunks.size());
-			while(!queuedFreeChunks.isEmpty()){
-				var ptr = queuedFreeChunks.removeLast();
-				var ch  = context.getChunk(ptr);
-				chs.add(ch);
-			}
-			return chs;
-		}
-	}
-	
-	@Override
-	public void free(Collection<Chunk> toFree) throws IOException{
-		try(var ioAccess = context.getSource().lockIO()){
-			context.checkValid();
-			if(toFree.isEmpty()) return;
-			allocationLock.lock();
-			try{
-				// A locked chunk is an expected refusal before any mutation; callers may recover.
-				checkCanFree(toFree);
-				try(var transaction = context.getSource().startTransaction()){
-					freeLocked(toFree);
-					for(var chunk : toFree) context.getUnmanagedRegistry().freed(chunk);
-					transaction.commit();
-				}
-			}finally{
-				allocationLock.unlock();
-			}
-		}
-	}
-	
-	private void checkCanFree(Collection<Chunk> toFree) throws FreeWhileUsed{
-		// The allocation lock also protects stack registration and notifyStart/notifyEnd.
-		synchronized(allStacks){
-			for(var stack : allStacks.values()){
-				for(Chunk chToFree : toFree){
-					for(var c : stack){
-						for(Chunk lockedCH : c.head.walkNext()){
-							if(chToFree.getPtr().equals(lockedCH.getPtr())){
-								var err = Log.fmt(
-									"{}#red was called to be freed but it is currently locked{}!",
-									chToFree,
-									lockedCH == c.head? "" : Log.fmt(" by {}#yellow", lockedCH)
-								);
-								throw new FreeWhileUsed(err);
-							}
-						}
+	private void assertNotOpen(Chunk chunk) throws FreeWhileUsed{
+		for(var stack : openChains.values()){
+			for(var chain : stack){
+				for(var pinned : chain.head.walkNext()){
+					if(pinned.getPtr().equals(chunk.getPtr())){
+						throw new FreeWhileUsed("Cannot free open chunk " + chunk.getPtr());
 					}
 				}
 			}
 		}
 	}
-	
-	private void freeLocked(Collection<Chunk> toFree) throws IOException{
-		var popped = popFile(toFree);
-		if(popped.isEmpty()){
+	@Override
+	public void free(Collection<Chunk> chunks) throws IOException{
+		try(var ignored = context.getSource().lockIO()){
+			context.checkValid();
+			freeLocked(chunks);
+		}
+	}
+	private void freeLocked(Collection<Chunk> chunks) throws IOException{
+		if(chunks.isEmpty()){
 			return;
 		}
 		
-		List<Chunk> toAdd = MemoryOperations.mergeChunks(popped);
+		var sorted = new ArrayList<>(chunks);
+		sorted.sort(Comparator.comparingLong(ch -> ch.getPtr().getValue()));
 		
-		if(adding){
-			addQueue(toAdd);
-			return;
-		}
-		
-		adding = true;
-		var oldAllowFreeRemove = allowFreeRemove;
-		allowFreeRemove = false;
+		var pending = new ArrayList<Entry>(sorted.size());
+		metadataLock.lock();
 		try{
-			addQueue(toAdd);
-			do{
-				var capacity        = freeChunks.getCapacity();
-				var optimalCapacity = freeChunks.size() + queuedFreeChunks.size();
-				if(capacity<optimalCapacity){
-					var cap = optimalCapacity + 1;
-					freeChunks.requestCapacity(cap);
+			checkHealthy();
+			
+			// Validate the whole batch before changing any bytes.
+			long previousEnd = -1;
+			for(var chunk : sorted){
+				chunk.requireReal();
+				
+				long address = chunk.getPtr().getValue();
+				if(address<previousEnd || chunk.totalSize()<Chunk.minSafeSize() || chunk.dataEnd()>context.getSource().getIOSize()){
+					throw new IOException("Invalid or overlapping free batch at " + chunk.getPtr());
 				}
 				
-				var chs = popQueue();
-				try(var ignored = context.getSource().startTransaction()){
-					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
-					ignored.commit();
+				previousEnd = chunk.dataEnd();
+				
+				var prev = byAddress.floorEntry(address);
+				var next = byAddress.ceilingEntry(address);
+				if(prev != null && prev.getValue().free.dataEnd()>address || next != null && chunk.dataEnd()>next.getKey()){
+					throw new IOException("Already free: " + chunk.getPtr());
 				}
-			}while(!queuedFreeChunks.isEmpty());
-		}finally{
-			adding = false;
-			allowFreeRemove = oldAllowFreeRemove;
+				
+				assertNotOpen(chunk);
+			}
+			
+			try(var transaction = context.getSource().openIOTransaction()){
+				for(var chunk : sorted){
+					// Claimed nodes remain linked but cannot be reused or merged
+					zero(chunk.getPtr().getValue(), chunk.getHeaderSize());
+					context.getChunkCache().notifyDestroyed(chunk);
+					pending.add(insert(chunk.getPtr().getValue(), chunk.totalSize(), true));
+				}
+				transaction.commit();
+			}catch(IOException|RuntimeException failure){
+				poison(failure);
+				throw failure;
+			}
+		}finally{ metadataLock.unlock(); }
+		
+		try{
+			// Large purges do not block selection or publication for unrelated extents.
+			for(var e : pending){
+				switch(ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve()){
+					case ZERO_OUT -> zero(e.free.dataStart(), e.free.getCapacity());
+					case ONLY_HEADER_BYTES -> MemoryOperations.purgePossibleChunkHeaders(context, e.free.dataStart(), e.free.getCapacity());
+					case NO_OP -> { }
+				}
+			}
+		}catch(IOException|RuntimeException failure){
+			metadataLock.lock();
+			try{
+				poison(failure);
+			}finally{
+				metadataLock.unlock();
+			}
+			throw failure;
 		}
 		
-		tryPopFree();
-	}
-	
-	private record MoveState(Chunk free, Chunk toMove){ }
-	
-	private boolean   popping;
-	private MoveState badMoveState;
-	private void tryPopFree() throws IOException{
-		if(!allowFreeRemove || popping) return;
-		popping = true;
-		try{
-			boolean anyPopped;
-			do{
-				anyPopped = false;
-				var lastFreeO = freeChunks.isEmpty()? OptionalPP.<Chunk>empty() : OptionalPP.of(freeChunks.getLast().dereference(context));
-				if(lastFreeO.filter(Chunk::checkLastPhysical).isPresent()){
-					var lastCh = lastFreeO.get();
-					
-					freeChunks.removeLast();
-					if(lastCh.checkLastPhysical()){
-						try(var io = context.getSource().io()){
-							io.setCapacity(lastCh.getPtr().getValue());
-						}
-						context.getChunkCache().notifyDestroyed(lastCh);
-						anyPopped = true;
-					}else{
-						free(lastCh);
-						return;
-					}
-				}else if(freeChunks.size()>1){
-					var nextO = lastFreeO.filter(c -> c.getCapacity()>=32).map(Chunk::nextPhysical);
-					if(nextO.filter(Chunk::checkLastPhysical).isPresent()){
-						var lastFree = lastFreeO.get();
-						var toMove   = nextO.get();
-						
-						if(lastFree.getCapacity()<toMove.getSize()*2){
-							return;
-						}
-						
-						if(badMoveState != null && badMoveState.equals(new MoveState(lastFree, toMove))){
-							return;
-						}
-						
-						var stack = getStack();
-						for(var c : stack){
-							if(c.head.equals(toMove)){
-								return;
-							}
-						}
-						// Compaction is optional. Waiting here would deadlock readers that need
-						// this lock to allocate, open a nested chain, or close their current chain.
-						// notifyStart/notifyEnd use the same lock, keeping this check stable during the move.
-						synchronized(allStacks){
-							cleanupStacks();
-							if(Iters.values(allStacks).anyMatch(l -> l != stack && !l.isEmpty())) return;
-						}
-						var oldAllowFreeRemove = allowFreeRemove;
-						try{
-							{//Disable modification of the list while it is being moved
-								var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
-								var freeRef = fch.getPointer();
-								if(freeRef.dereference(context).walkNext().anyIs(toMove)){
-									allowFreeRemove = false;
-								}
-							}
-							
-							var move = DefragmentManager.moveReference(
-								(Cluster)context, toMove.getPtr(),
-								t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
-								false);
-							if(move.hasAny()){
-								anyPopped = true;
-								for(var cha : stack){
-									if(move.chainAffected(cha.head)){
-										cha.revalidate();
-									}
-								}
-							}else badMoveState = new MoveState(lastFree.clone(), toMove.clone());
-						}finally{
-							allowFreeRemove = oldAllowFreeRemove;
-						}
-					}
-				}
-			}while(anyPopped);
+		boolean ownsTail = tailLock.tryLock();
+		metadataLock.lock();
+		try(var transaction = context.getSource().openIOTransaction()){
+			checkHealthy();
+			
+			for(var e : pending){
+				release(e);
+			}
+			if(ownsTail) trimTail();
+			
+			transaction.commit();
+		}catch(IOException|RuntimeException failure){
+			poison(failure);
+			throw failure;
 		}finally{
-			popping = false;
+			metadataLock.unlock();
+			if(ownsTail) tailLock.unlock();
 		}
 	}
 	
-	private Collection<Chunk> popFile(Collection<Chunk> toFree) throws IOException{
-		Collection<Chunk> result = toFree;
-		boolean           dirty  = true;
-		
-		if(toFree.isEmpty()) return toFree;
-		var end = context.getSource().getIOSize();
-		
-		List<Chunk> toNotify = new ArrayList<>();
-		boolean     any      = false;
-		
-		Map<ChunkPointer, Chunk> nextMap = null;
-		Set<Chunk>               toClear = null;
-		
-		wh:
-		while(true){
-			for(var i = result.iterator(); i.hasNext(); ){
-				Chunk chunk = i.next();
-				if(chunk.dataEnd()<end) continue;
-				
-				if(dirty){
-					dirty = false;
-					result = new ArrayList<>(result);
-					continue wh;
-				}
-				any = true;
-				end = chunk.getPtr().getValue();
-				var ptr = chunk.getPtr();
-				
-				i.remove();
-				if(toClear != null) toClear.remove(chunk);
-				toNotify.add(chunk);
-				
-				if(nextMap == null){
-					nextMap = new HashMap<>();
-					for(var c : result){
-						var next = c.getNextPtr();
-						if(!next.isNull()) nextMap.put(next, c);
-					}
-				}
-				
-				var prev = nextMap.get(ptr);
-				if(prev != null){
-					if(toClear == null) toClear = new HashSet<>();
-					toClear.add(prev);
-				}
-				continue wh;
-			}
+	private void trimTail() throws IOException{
+		while(!byAddress.isEmpty()){
+			var e = byAddress.lastEntry().getValue();
+			if(e.claimed || e.free.dataEnd() != physicalEnd) return;
 			
-			if(!any){
-				return result;
-			}
-			any = false;
-			
+			long newEnd = e.address();
+			unlink(e);
 			try(var io = context.getSource().io()){
-				if(toClear != null) for(var c : toClear){
-					if(c.getPtr().compareTo(end)>=0) continue;
-					c.setSize(0);
-					c.clearAndCompressHeader();
-					if(!c.dirty()) continue;
-					var b = c.writeHeaderToBuf();
-					io.setPos(b.ioOffset()).write(b.data(), b.dataOffset(), b.dataLength());
-				}
-				io.setCapacity(end);
+				io.setCapacity(newEnd);
 			}
-			
-			context.getChunkCache().notifyDestroyed(toNotify);
-			toNotify.clear();
-			
-			var before = context.getSource().getIOSize();
-			tryPopFree();
-			var after = context.getSource().getIOSize();
-			if(after>=before){
-				return result;
-			}
-			end = after;
-			if(toClear != null) toClear.clear();
+			physicalEnd = newEnd;
 		}
 	}
 }

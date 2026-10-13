@@ -643,13 +643,14 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, String src) throws IOException{
+			var pos = dest.getPos();
 			var ref = dest.remaining() == 0? Reference.NULL : readInline(dest);
 			if(ref.isNull()){
 				//TODO: create mechanism for assumed fixed field first, then if growth needed switch to explicit next size
 				var d = new AutoText(src);
 				var t = AllocateTicket.bytes(AutoText.Info.PIPE.calcUnknownSize(provider, d, WordSpace.BYTE))
 				                      .withDataPopulated(AutoText.Info.PIPE, d);
-				writeNew(dest, t, provider, refPipe);
+				writeNew(dest.setPos(pos), t, provider, refPipe);
 			}else{
 				ref.write(provider, true, AutoText.Info.PIPE, new AutoText(src));
 			}
@@ -1084,7 +1085,7 @@ public sealed interface ValueStorage<T>{
 				}
 				var ch = ticket.submit(provider);
 				try{
-					writeInline(dest, new TypedReference(ch.getPtr().makeReference(), id));
+					writeInline(dest.setPos(orgPos), new TypedReference(ch.getPtr().makeReference(), id));
 				}catch(Throwable e){
 					provider.getMemoryManager().free(ch);
 					throw e;

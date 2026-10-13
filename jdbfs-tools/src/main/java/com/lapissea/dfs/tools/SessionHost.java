@@ -1,7 +1,7 @@
 package com.lapissea.dfs.tools;
 
 import com.lapissea.dfs.core.Cluster;
-import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.PhysicalExtent;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.MemFrame;
 import com.lapissea.dfs.utils.RawRandom;
@@ -24,7 +24,7 @@ public class SessionHost implements DataLogger{
 		int                    index;
 		WeakReference<Cluster> cluster = new WeakReference<>(null);
 		Throwable              displayError;
-		Chunk                  lastHoverChunk;
+		PhysicalExtent         lastHoverChunk;
 		public ParsedFrame(int index){
 			this.index = index;
 		}

@@ -10,7 +10,9 @@ import com.lapissea.dfs.core.chunk.ChainWalker;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.chunk.ChunkSet;
-import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
+import com.lapissea.dfs.core.chunk.FreeChunk;
+import com.lapissea.dfs.core.chunk.PhysicalExtent;
+import com.lapissea.dfs.core.chunk.PhysicalExtentWalker;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -870,21 +872,17 @@ public class BinaryGridRenderer implements DataRenderer{
 					assert annCtx.stack.isEmpty();
 					annCtx.stack.add(null);
 					
-					var  done  = new ChunkSet();
-					var  frees = new ChunkSet(provider.getMemoryManager().getFreeChunks());
-					long pos   = cluster.getFirstChunk().getPtr().getValue();
+					var done = new ChunkSet();
+					long pos = cluster.getFirstChunk().getPtr().getValue();
 					while(pos<bytes.length){
 						try{
-							for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
-								pos = chunk.dataEnd();
+							var extent = PhysicalExtent.read(provider, ChunkPointer.of(pos));
+							pos = extent.dataEnd();
+							if(extent instanceof FreeChunk free){
+								annotateFreeChunk(annCtx, free);
+							}else if(extent instanceof Chunk chunk){
 								if(referenced.contains(chunk.getPtr())){
-									if(frees.contains(chunk.getPtr())){
-										drawByteRanges(ctx,
-										               List.of(new DrawUtils.Range(chunk.dataStart(), Math.min(cluster.getSource().getIOSize(), chunk.dataEnd()))),
-										               ColorUtils.alpha(Color.YELLOW, 0.15F), false, false);
-									}else{
-										fillChunk(ctx, chunk, true, false);
-									}
+									fillChunk(ctx, chunk, true, false);
 								}else{
 									drawByteRanges(ctx,
 									               List.of(new DrawUtils.Range(chunk.dataStart(), Math.min(cluster.getSource().getIOSize(), chunk.dataEnd()))),
@@ -896,8 +894,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								}
 							}
 						}catch(IOException e){
-							var p = (int)pos;
-							drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
+							drawBytes(ctx, IntStream.of((int)pos), Color.RED, true, true);
 							pos++;
 						}
 					}
@@ -920,10 +917,10 @@ public class BinaryGridRenderer implements DataRenderer{
 				}
 				while(pos<bytes.length){
 					try{
-						for(Chunk chunk : new PhysicalChunkWalker(provider.getChunk(ChunkPointer.of(pos)))){
-							pos = chunk.dataEnd();
-							annotateChunk(annCtx, chunk);
-						}
+						var extent = PhysicalExtent.read(provider, ChunkPointer.of(pos));
+						pos = extent.dataEnd();
+						if(extent instanceof FreeChunk free) annotateFreeChunk(annCtx, free);
+						else annotateChunk(annCtx, (Chunk)extent);
 					}catch(IOException e){
 						var p = (int)pos;
 						drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
@@ -945,6 +942,28 @@ public class BinaryGridRenderer implements DataRenderer{
 		drawTimeline(ctx.renderer, frameIndex);
 	}
 	
+	private void annotateFreeChunk(AnnotateCtx ctx, FreeChunk free){
+		var start = free.getPtr().getValue();
+		var headerEnd = start + free.getHeaderSize();
+		var color = ColorUtils.alpha(Color.YELLOW, 0.5F);
+		drawByteRanges(ctx.renderCtx, List.of(new DrawUtils.Range(start, headerEnd)), color, true, true);
+		drawByteRanges(ctx.renderCtx, List.of(new DrawUtils.Range(headerEnd, free.dataEnd())),
+		               ColorUtils.alpha(Color.YELLOW, 0.15F), false, false);
+		ctx.renderCtx.hoverMessages.add(new HoverMessage(
+			List.of(new DrawUtils.Range(start, free.dataEnd())), color, new Object[]{free}
+		));
+		if(!free.getNextPtr().isNull()){
+			ctx.recordPointer(new Pointer(headerEnd - 8, free.getNextPtr().getValue(), 8,
+			                              Color.YELLOW, "Next free chunk", 1));
+		}
+	}
+	private static boolean contains(PhysicalExtent extent, long position){
+		return position>=extent.getPtr().getValue() && position<extent.dataEnd();
+	}
+	private static long dataStart(PhysicalExtent extent){
+		return extent.getPtr().getValue() + extent.getHeaderSize();
+	}
+
 	private void annotateChunk(AnnotateCtx ctx, Chunk chunk) throws IOException{
 		annotateStruct(ctx, chunk, null, Chunk.PIPE, null, true, false);
 		var rctx = ctx.renderCtx;
@@ -1129,7 +1148,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			int pSiz = ptr.size();
 			
 			Color col;
-			if(parsed.lastHoverChunk != null && new ChainWalker(parsed.lastHoverChunk).anyMatch(ch -> ch.rangeIntersects(ptr.from()))){
+			if(parsed.lastHoverChunk != null && (parsed.lastHoverChunk instanceof Chunk live? new ChainWalker(live).anyMatch(ch -> ch.rangeIntersects(ptr.from())) : contains(parsed.lastHoverChunk, ptr.from()))){
 				col = ColorUtils.mix(CHUNK_BASE_COLOR, ptr.color(), 0.5F);
 				drawMsg = true;
 				renderer.setLineWidth(sFul*ptr.widthFactor()*2);
@@ -1291,7 +1310,11 @@ public class BinaryGridRenderer implements DataRenderer{
 			var chunk = parsed.lastHoverChunk;
 			ctx.renderer.setLineWidth(1);
 			try{
-				outlineChunk(ctx, chunk, ColorUtils.mix(CHUNK_BASE_COLOR, Color.WHITE, 0.4F));
+				if(chunk instanceof Chunk live){
+					outlineChunk(ctx, live, ColorUtils.mix(CHUNK_BASE_COLOR, Color.WHITE, 0.4F));
+				}else{
+					outlineByteRange(Color.YELLOW, ctx, new DrawUtils.Range(chunk.getPtr().getValue(), chunk.dataEnd()));
+				}
 			}catch(IOException e){
 				handleError(e, parsed);
 			}
@@ -1317,7 +1340,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		while(bStr.length()<3) bStr.append(" ");
 		bStr.append(ctx.renderer.getFont().canFontDisplay(bytes[byteIndex])? " = " + (char)b : "");
 		ctx.hoverMessages().addAll(0, List.of(new HoverMessage(List.of(new DrawUtils.Range(0, 0)), null, new Object[]{
-			parsed.lastHoverChunk != null && byteIndex>=parsed.lastHoverChunk.dataStart()? new Reference(parsed.lastHoverChunk.getPtr(), byteIndex - parsed.lastHoverChunk.dataStart()).toString() : "",
+			parsed.lastHoverChunk != null && byteIndex>=dataStart(parsed.lastHoverChunk)? new Reference(parsed.lastHoverChunk.getPtr(), byteIndex - dataStart(parsed.lastHoverChunk)).toString() : "",
 			"@" + byteIndex
 		}), new HoverMessage(List.of(new DrawUtils.Range(0, 0)), null, new Object[]{bStr.toString()})));
 		
@@ -1343,10 +1366,10 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		
 		try{
-			if(parsed.lastHoverChunk == null || !parsed.lastHoverChunk.rangeIntersects(byteIndex)){
+			if(parsed.lastHoverChunk == null || !contains(parsed.lastHoverChunk, byteIndex)){
 				parsed.lastHoverChunk = null;
-				for(Chunk chunk : new PhysicalChunkWalker(provider.getFirstChunk())){
-					if(chunk.rangeIntersects(byteIndex)){
+				for(var chunk : new PhysicalExtentWalker(provider, provider.getFirstChunk().getPtr())){
+					if(contains(chunk, byteIndex)){
 						markDirty();
 						parsed.lastHoverChunk = chunk;
 						break;
@@ -1477,6 +1500,15 @@ public class BinaryGridRenderer implements DataRenderer{
 					long      trueOffset = offsetStart + fieldOffset;
 					final var sizeDesc   = field.getSizeDescriptor();
 					size = sizeDesc.calcUnknown(ioPool, ctx.provider, instance, sizeDesc.getWordSpace());
+					if(!noPtr && field.getName().equals("firstFreeChunk") &&
+					   instance.getClass().getName().equals("com.lapissea.dfs.core.Cluster$Metadata")){
+						var head = ((Number)field.get(ioPool, instance)).longValue();
+						if(head != 0){
+							var from = reference.addOffset(fieldOffset).calcGlobalOffset(ctx.provider);
+							ctx.recordPointer(new Pointer(from, head, (int)sizeDesc.mapSize(WordSpace.BYTE, size),
+							                              Color.YELLOW, "First free chunk", 1));
+						}
+					}
 					
 					try{
 						var acc = field.getAccessor();

@@ -3,6 +3,8 @@ package com.lapissea.dfs.benchmark;
 import com.lapissea.util.LogUtil;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Consumer;
@@ -10,18 +12,21 @@ import java.util.function.Consumer;
 @SuppressWarnings("Convert2MethodRef")
 public class RunBenchmarkDebug{
 	
-	public static void main(String[] args){
+	public static void main(String[] args) throws IOException{
 //		doWalk(args);
 		
 		var bench = new MemoryManagementBenchmark();
-		bench.entropy = 15000;
-		bench.allocations = 200;
-		bench.initSrc();
+		var state = new MemoryManagementBenchmark.Chunks();
+		state.freeChunks = 4096;
+		state.setup();
 		
 		jitHandle(new String[]{"jit"}, bench, ioWalkBench -> {
-			bench.initData();
-			bench.alloc();
+			try{
+				bench.allocateChunks(state);
+				state.reclaim();
+			}catch(IOException e){ throw new UncheckedIOException(e); }
 		});
+		state.checkBoundedFile();
 	}
 	
 	private static void doWalk(String[] args){

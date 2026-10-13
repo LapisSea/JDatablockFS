@@ -357,6 +357,13 @@ public final class TestUtils{
 	public static Cluster optionallyLogged(boolean logged, String name) throws IOException{
 		return Cluster.init(optionallyLoggedMemory(logged, name));
 	}
+	/**
+	 * Reopens a memory-backed cluster from a byte snapshot. Canonical unmanaged identities forbid two live
+	 * clusters over the same source, so reopening must use a distinct {@link MemoryData}.
+	 */
+	public static Cluster reopenMem(Cluster cluster) throws IOException{
+		return Cluster.initOrOpen(MemoryData.of(cluster.getSource().readAll()));
+	}
 	public static IOInterface optionallyLoggedMemory(boolean logged, String name) throws IOException{
 		if(!logged) return MemoryData.builder().withRaw(new byte[MagicID.size()]).build();
 		class Lazy{
