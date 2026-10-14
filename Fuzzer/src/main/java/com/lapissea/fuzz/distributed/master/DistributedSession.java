@@ -262,17 +262,26 @@ public final class DistributedSession{
 			bundleId = bundle.id();
 			for(var host : hosts){
 				Thread.ofVirtual().name("fuzz-launch-" + host.name()).start(() -> {
+					if(closed) return;
 					try{
-						if(closed){ return; }
-						var process = SshWorkerLauncher.launch(host, bundle, server.getLocalPort(), HelperMain.class.getName(),
-						                                       List.of("127.0.0.1", Integer.toString(host.tunnelPort()), sessionId.toString(),
-						                                               host.name(), Integer.toString(host.parallelism()), bundle.id()));
+						var process = SshWorkerLauncher.launch(
+							host, bundle, server.getLocalPort(), HelperMain.class.getName(),
+							List.of("127.0.0.1", Integer.toString(host.tunnelPort()), sessionId.toString(),
+							        host.name(), Integer.toString(host.parallelism()), bundle.id())
+						);
+						
 						registerResource(process);
 						process.process().onExit().thenRun(() -> helperResolved(host.name()));
-						Thread.ofVirtual().name("fuzz-drain-" + host.name()).start(() -> drain(process.process().getInputStream(), System.out, host.name()));
+						
+						Thread.ofVirtual().name("fuzz-drain-" + host.name()).start(() -> {
+							drain(process.process().getInputStream(), System.out, host.name());
+						});
+						
 						var pending = pendingHelpers.get(host.name());
 						if(pending != null){
-							try{ pending.get(60, TimeUnit.SECONDS); }catch(TimeoutException timeout){
+							try{
+								pending.get(60, TimeUnit.SECONDS);
+							}catch(TimeoutException timeout){
 								boolean expired;
 								synchronized(lifecycleLock){ expired = pendingHelpers.remove(host.name(), pending); }
 								if(expired){
@@ -287,7 +296,7 @@ public final class DistributedSession{
 						helperResolved(host.name());
 						// Configuration problems carry their own explanation; an unexpected failure
 						// keeps its class name, which is the part worth reading there.
-						System.err.println("Fuzzer helper " + host.name() + " unavailable for this session: " +
+						System.err.println("Fuzzer helper \"" + host.name() + "\" unavailable for this session:\n  " +
 						                   (e instanceof IOException? e.getMessage() : e));
 					}
 				});

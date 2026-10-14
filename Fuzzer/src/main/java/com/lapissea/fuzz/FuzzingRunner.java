@@ -42,7 +42,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	/**
 	 * Creates a {@link #FuzzingRunner} that can run across multiple machines.
-	 * The recipe is a serializable lambda and thus, all the values it captures must be serializable.
+	 * The recipe is a serializable lambda and all the values it captures must be serializable.
 	 */
 	public static <R extends FuzzingRunner<?, ?, ?>> R distributed(Recipe<R> recipe){
 		var encoded = RecipeCodec.encode(Objects.requireNonNull(recipe));

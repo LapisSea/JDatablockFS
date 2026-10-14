@@ -1,6 +1,7 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.config.ConfigTools;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.exceptions.LockedFlagSet;
@@ -22,8 +23,10 @@ import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.fuzz.Plan;
 import com.lapissea.fuzz.RunMark;
+import com.lapissea.fuzz.distributed.master.DistributedSession;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -39,7 +42,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
@@ -48,7 +50,7 @@ import java.util.random.RandomGenerator;
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
 public final class StructFuzzTest{
-
+	
 	private static final List<BiFunction<String, RandomGenerator, TempClassGen.FieldGen>> fieldTypes = List.of(
 		StructFuzzTest::signedInt,
 		StructFuzzTest::unsignedInt,
@@ -238,15 +240,27 @@ public final class StructFuzzTest{
 		simpleEncounter.add(gen);
 	}
 	
+	@BeforeClass(alwaysRun = true)
+	public void preloadFuzzHelpers(){
+		DistributedSession.preload();
+	}
+	
 	@Test(dependsOnGroups = "earlyCheck")
 	public void fuzzGen() throws LockedFlagSet{
+		var sequence = new FuzzSequenceSource.LenSeed(69420, 5_000, 1);
+		var iters    = sequence.totalIterations();
+		var runner   = FuzzingRunner.distributed(() -> doFuzzGen(iters));
 		
-		var sequenceSource = new FuzzSequenceSource.LenSeed(69420, 5_000, 1);
+		FuzzingUtils.stableRun(Plan.start(
+			runner,
+			sequence
+//				() -> Stream.of(FuzzSequence.fromDataStick("IhiDAoMCEwMzGt0SxnwB"))
+		), "fuzzChainResize");
 		
+	}
+	private static FuzzingRunner<?, ?, ?> doFuzzGen(double totalIterations){
 		Set<TempClassGen.ClassGen> encountered = Collections.newSetFromMap(new ConcurrentHashMap<>());
-		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<TempClassGen.ClassGen, Object, IOException>(){
-			
-			{ encountered.addAll(simpleEncounter); }
+		return new FuzzingRunner<>(new FuzzingStateEnv.Marked<TempClassGen.ClassGen, Object, IOException>(){
 			
 			@Override
 			public void applyAction(TempClassGen.ClassGen state, long actionIndex, Object action, RunMark mark) throws IOException{
@@ -281,25 +295,34 @@ public final class StructFuzzTest{
 				return tryCreate(rand, sequenceIndex, randFieldCount(rand, sequenceIndex));
 			}
 			private int randFieldCount(RandomGenerator rand, long sequenceIndex){
-				var fac        = sequenceIndex/(double)sequenceSource.totalIterations();
+				var fac        = sequenceIndex/totalIterations;
 				var fieldCount = 1 + rand.nextInt((int)(fac*7) + 1);
 				if(sequenceIndex == 1) fieldCount = 0;
 				return fieldCount;
 			}
+			
+			ConfigTools.Flag.TempFlagVal<?> def;
+			@Override
+			public void prepareRun(){
+				try{
+					def = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE);
+				}catch(LockedFlagSet e){
+					throw new RuntimeException(e);
+				}
+			}
+			@Override
+			public void cleanupRun(){
+				try{
+					def.close();
+				}catch(LockedFlagSet e){
+					throw new RuntimeException(e);
+				}
+			}
 		}, FuzzingRunner::noopAction);
 		
-		
-		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
-			FuzzingUtils.stableRun(Plan.start(
-				runner,
-				sequenceSource
-//				() -> Stream.of(FuzzSequence.fromDataStick("IhiDAoMCEwMzGt0SxnwB"))
-			), "fuzzChainResize");
-		}
-		LogUtil.println(encountered.size(), sequenceSource.totalIterations(), encountered.size()/(double)sequenceSource.totalIterations()*100);
 	}
 	
-	public <T extends IOInstance<T>> void testType(TempClassGen.ClassGen def) throws IOException, ReflectiveOperationException{
+	public static <T extends IOInstance<T>> void testType(TempClassGen.ClassGen def) throws IOException, ReflectiveOperationException{
 //		LogUtil.println(def);
 //		LogUtil.println(def.name());
 		
@@ -327,7 +350,7 @@ public final class StructFuzzTest{
 		}
 	}
 	
-	private TempClassGen.ClassGen tryCreate(RandomGenerator rand, long sequenceIndex, int fieldCount){
+	private static TempClassGen.ClassGen tryCreate(RandomGenerator rand, long sequenceIndex, int fieldCount){
 		if(rand.nextFloat()>0.99) fieldCount *= 10;
 		
 		var fields = Iters.rand(rand, fieldCount, 0, fieldTypes.size()).enumerate()

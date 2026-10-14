@@ -160,15 +160,14 @@ public final class SshWorkerLauncher{
 			throw e;
 		}
 	}
-	/**
-	 * The machine's OS: declared in the config, or detected with one ssh round-trip ({@link OsProbe}) when unset.
-	 */
+	
 	private static HostOs resolveOs(RemoteConfig.Host host) throws IOException, InterruptedException{
 		var declared = host.declaredOs();
 		if(declared.isPresent()){ return declared.get(); }
 		var answer = OsProbe.detect(host);
-		System.out.println("Fuzzer helper " + host.name() + " detected as " + answer.os().name().toLowerCase() +
-		                   " (" + answer.evidence4K() + ")");
+		System.out.println(
+			"Fuzzer helper " + host.name() + " detected as " + answer.os().name().toLowerCase() + " (" + answer.evidence4K() + ")"
+		);
 		return answer.os();
 	}
 	
@@ -189,7 +188,7 @@ public final class SshWorkerLauncher{
 	private static String label(HostOs os){ return os.name().toLowerCase(); }
 	
 	static String willNotConnect(RemoteConfig.Host host, String reason){
-		return "Fuzzer helper \"" + host.name() + "\" (" + host.sshHost() + ") will not connect: " + reason + ".";
+		return "\"" + host.name() + "\" (" + host.sshHost() + ") will not connect: " + reason;
 	}
 	private static void connectTunnel(RemoteConfig.Host host, Process process, IntFunction<?> requestForPort) throws IOException, InterruptedException{
 		var port = new CompletableFuture<Integer>();
