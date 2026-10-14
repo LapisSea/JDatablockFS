@@ -9,16 +9,11 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.GcDelayer;
 import com.lapissea.dfs.utils.KeyCounter;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
-import com.lapissea.dfs.utils.WeakKeyValueMap;
-import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
-import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
 import static com.lapissea.util.ConsoleColors.GREEN_BRIGHT;
@@ -30,16 +25,24 @@ final class CompileStructTools{
 		S make(Class<T> type, int syncStage);
 	}
 	
-	private static class WaitHolder{
-		private boolean wait = true;
+	
+	private static class ValueHolder{
+		
+		volatile Struct<?> struct;
+		
+		Thread  thread;
+		boolean wait;
 	}
 	
-	private static final ReadWriteClosableLock                STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
-	private static final WeakKeyValueMap<Class<?>, Struct<?>> STRUCT_CACHE      = new WeakKeyValueMap<>();
-	private static final Map<Class<?>, WaitHolder>            NON_CONCRETE_WAIT = new HashMap<>();
-	private static final Map<Class<?>, Thread>                STRUCT_THREAD_LOG = new HashMap<>();
+	private static final ReadWriteClosableLock STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
 	
-	private static Map<Integer, WeakReference<Struct<?>>[]> STABLE_CACHE = Map.of();
+	private static final ClassValue<ValueHolder> STABLE_CACHE = new ClassValue<>(){
+		@Override
+		protected ValueHolder computeValue(Class<?> type){
+			return new ValueHolder();
+		}
+	};
+	
 	
 	private static final KeyCounter<String> COMPILATION_COUNT = new KeyCounter<>();
 	private static final Duration           GC_DELAY          = ConfigDefs.DELAY_COMP_OBJ_GC.resolveLocking();
@@ -47,56 +50,21 @@ final class CompileStructTools{
 	
 	@SuppressWarnings("unchecked")
 	static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
-		var       stableRefs = STABLE_CACHE.get(instanceClass.hashCode());
-		Struct<T> cached;
-		if(stableRefs != null && (cached = getStable(instanceClass, stableRefs)) != null){
-			return cached;
+		var holder = STABLE_CACHE.get(instanceClass);
+		if(noNeedForNonConcrete(instanceClass)){
+			return (Struct<T>)holder.struct;
 		}
 		
-		boolean noNeedForNonConcrete = noNeedForNonConcrete(instanceClass);
 		try(var lock = STRUCT_CACHE_LOCK.read()){
-			if(noNeedForNonConcrete){
-				cached = (Struct<T>)STRUCT_CACHE.get(instanceClass);
-			}else{
-				cached = getCachedUnsafe(instanceClass, lock.getLock());
-			}
-			if(cached == null) return null;
-			
-			if(++cached.unstableAccess>200 || STABLE_CACHE.isEmpty()){
-				cached.unstableAccess = 0;
-				rebuildStableCache();
-			}
+			return getCachedUnsafe(instanceClass, lock.getLock());
 		}
-		return cached;
-	}
-	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Struct<T> getStable(Class<T> instanceClass, WeakReference<Struct<?>>[] stableRefs){
-		for(var ref : stableRefs){
-			Struct<?> val = ref.get();
-			if(val == null) continue;
-			if(val.getType() == instanceClass || val.getConcreteType() == instanceClass){
-				return (Struct<T>)val;
-			}
-		}
-		return null;
-	}
-	
-	private static void rebuildStableCache(){
-		var groups = STRUCT_CACHE.iter().toGrouping(e -> e.getKey().hashCode());
-		STABLE_CACHE = Iters.entries(groups).toMap(
-			Map.Entry::getKey,
-			group -> Iters.from(group.getValue()).map(e -> new WeakReference<>(e.getValue()))
-			              .toArray(s -> {
-				              //noinspection unchecked
-				              return (WeakReference<Struct<?>>[])new WeakReference[s];
-			              })
-		);
 	}
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Struct<T> getCachedUnsafe(Class<T> instanceClass, Lock lock){
 		waitNonConcrete(instanceClass, lock);
-		return (Struct<T>)STRUCT_CACHE.get(instanceClass);
+		var stableHolder = STABLE_CACHE.get(instanceClass);
+		return (Struct<T>)stableHolder.struct;
 	}
 	private static <T extends IOInstance<T>> void waitNonConcrete(Class<T> instanceClass, Lock lock){
 		if(noNeedForNonConcrete(instanceClass)) return;
@@ -108,18 +76,17 @@ final class CompileStructTools{
 		while(!queue.isEmpty()){
 			var cl = queue.pop();
 			for(var interf : cl.getInterfaces()){
-				var holder = NON_CONCRETE_WAIT.get(interf);
-				if(holder != null){
-					if(holder.wait){
-						recursiveCompileCheck(interf);
-					}
-					
-					while(holder.wait){
-						lock.unlock();
-						UtilL.sleep(1);
-						lock.lock();
-					}
+				var holder = STABLE_CACHE.get(interf);
+				if(holder.wait){
+					recursiveCompileCheck(interf);
 				}
+				
+				while(holder.wait){
+					lock.unlock();
+					UtilL.sleep(1);
+					lock.lock();
+				}
+				
 				queue.push(interf);
 			}
 			var sup = cl.getSuperclass();
@@ -160,10 +127,9 @@ final class CompileStructTools{
 		
 		var printLogLevel = ConfigDefs.PRINT_COMPILATION.resolve();
 		
-		var wh = needsImpl? new WaitHolder() : null;
-		
 		S struct;
 		
+		ValueHolder holder = STABLE_CACHE.get(instanceClass);
 		try(var lock = STRUCT_CACHE_LOCK.write()){
 			recursiveCompileCheck(instanceClass);
 			
@@ -172,7 +138,7 @@ final class CompileStructTools{
 			if(existing != null) return (S)existing;
 			
 			//The struct is being synchronously requested and the lock is released
-			if(STRUCT_THREAD_LOG.get(instanceClass) != null){
+			if(holder.thread != null){
 				S cached = waitForDoneCompiling(instanceClass, lock);
 				if(cached != null) return cached;
 			}
@@ -183,8 +149,8 @@ final class CompileStructTools{
 			}
 			
 			try{
-				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
-				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, wh);
+				holder.thread = Thread.currentThread();
+				if(needsImpl) holder.wait = true;
 				
 				lock.getLock().unlock();
 				try{
@@ -193,15 +159,19 @@ final class CompileStructTools{
 					lock.getLock().lock();
 				}
 				
-				var old = STRUCT_CACHE.put(instanceClass, struct);
-				assert old == null;
+				assert holder.struct == null;
+				holder.struct = struct;
 			}catch(MalformedStruct e){
 				e.addSuppressed(new MalformedStruct("fmt", "Failed to compile {}#red", instanceClass.getName()));
 				throw e;
 			}catch(Throwable e){
 				throw new MalformedStruct("fmt", e, "Failed to compile {}#red", instanceClass.getName());
 			}finally{
-				STRUCT_THREAD_LOG.remove(instanceClass);
+				holder.thread = null;
+				//a failed compile never reaches the STATE_CONCRETE_TYPE callback, so need to release waiters here
+				if(holder.struct == null){
+					holder.wait = false;
+				}
 			}
 		}
 		
@@ -215,8 +185,9 @@ final class CompileStructTools{
 				var     impl = struct.getConcreteType();
 				boolean hadOld;
 				try(var ignored = STRUCT_CACHE_LOCK.write()){
-					hadOld = STRUCT_CACHE.put(impl, struct) != null;
-					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
+					hadOld = STABLE_CACHE.get(impl).struct != null;
+					STABLE_CACHE.get(impl).struct = struct;
+					holder.wait = false;
 				}
 				if(hadOld) Log.trace("Replaced existing struct {}#yellow in cache", impl);
 			}catch(Throwable ignored){ }
@@ -244,10 +215,11 @@ final class CompileStructTools{
 	private static <T extends IOInstance<T>, S extends Struct<T>> S waitForDoneCompiling(Class<T> instanceClass, ReadWriteClosableLock.LockSession writeLock){
 		var wl = writeLock.getLock();
 		wl.unlock();
+		var holder = STABLE_CACHE.get(instanceClass);
 		while(true){
 			UtilL.sleep(1);
 			try(var ignore = STRUCT_CACHE_LOCK.read()){
-				if(STRUCT_THREAD_LOG.get(instanceClass) == null){
+				if(holder.thread == null){
 					break;
 				}
 			}
@@ -258,7 +230,8 @@ final class CompileStructTools{
 	}
 	
 	private static void recursiveCompileCheck(Class<?> interf){
-		Thread thread = STRUCT_THREAD_LOG.get(interf);
+		var    holder = STABLE_CACHE.get(interf);
+		Thread thread = holder.thread;
 		if(thread != null && thread == Thread.currentThread()){
 			throw new RecursiveSelfCompilation("Recursive struct compilation of: " + interf.getTypeName());
 		}
