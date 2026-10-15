@@ -75,16 +75,18 @@ public final class HelperMain{
 				}
 			});
 			
+			int silenceTimeoutSeconds = Integer.getInteger("fuzz.silenceTimeoutSeconds", Wire.SILENCE_TIMEOUT_SECONDS);
+			
 			Thread.ofVirtual().name("fuzz-master-watchdog").start(() -> {
 				while(true){
 					try{
-						Thread.sleep(1000);
+						Thread.sleep(100);
 					}catch(InterruptedException e){
 						return;
 					}
 					long now = System.nanoTime(), done = finishing.get();
 					if((done != 0 && now - done>TimeUnit.SECONDS.toNanos(5)) ||
-					   now - lastMessage.get()>TimeUnit.SECONDS.toNanos(Wire.SILENCE_TIMEOUT_SECONDS)){
+					   now - lastMessage.get()>TimeUnit.SECONDS.toNanos(silenceTimeoutSeconds)){
 						// Kill unresponsive jobs as well as the protocol loop. Shutdown hooks release workspace
 						System.exit(2);
 					}

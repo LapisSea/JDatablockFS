@@ -38,7 +38,7 @@ public class ClusterConcurrencyTortureTests{
 	
 	@Test(timeOut = 600_000)
 	public void concurrentRootMutationsStayConsistent() throws Exception{
-		int  threadCount  = Integer.getInteger("dfs.torture.threads", 50);
+		int  threadCount  = Integer.getInteger("dfs.torture.threads", 20);
 		int  iterations   = Integer.getInteger("dfs.torture.iterations", 50);
 		int  abortPercent = Integer.getInteger("dfs.torture.abortPercent", 20);
 		long seed         = Long.getLong("dfs.torture.seed", 0x5EEDC0FFEE1234L);

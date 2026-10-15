@@ -21,11 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 public final class HelperProtocolTest{
 	
@@ -64,32 +60,32 @@ public final class HelperProtocolTest{
 		if(!modulePath.isEmpty()){ classpath += File.pathSeparator + modulePath; }
 		return new ProcessBuilder(
 			Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-			"-Dfuzz.workerDiagnostics=true", "-cp", classpath,
+			"-Dfuzz.workerDiagnostics=true", "-Dfuzz.silenceTimeoutSeconds=5", "-cp", classpath,
 			HelperMain.class.getName(), "127.0.0.1", Integer.toString(server.getLocalPort()), token, "test-helper",
 			"1", "test-bundle"
 		).redirectError(ProcessBuilder.Redirect.INHERIT)
 		 .start();
 	}
 	
-	@Test(timeOut = 55000)
+	@Test(timeOut = 7000)
 	public void helperExitsWhenMasterGoesSilent() throws Exception{
 		try(var server = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))){
-			server.setSoTimeout(10000);
+			server.setSoTimeout(1000);
 			
 			var process = helperProcess(server, UUID.randomUUID().toString());
 			try(var wire = new Wire(server.accept())){
-				wire.socket.setSoTimeout(10000);
+				wire.socket.setSoTimeout(1000);
 				
 				assertTrue(wire.receive() instanceof Wire.Hello);
 				wire.send(new Wire.Ping());
 				assertEquals(wire.receive(), new Wire.Ping());
 				
 				// Keep the transport open: EOF must not be what triggers this shutdown
-				assertTrue(process.waitFor(Wire.SILENCE_TIMEOUT_SECONDS + 5, TimeUnit.SECONDS), "Silent master left its helper alive");
+				assertTrue(process.waitFor(6, TimeUnit.SECONDS), "Silent master left its helper alive");
 				assertEquals(process.exitValue(), 2);
 			}finally{
 				process.destroyForcibly();
-				process.waitFor(5, TimeUnit.SECONDS);
+				process.waitFor(5*1000/10, TimeUnit.MILLISECONDS);
 			}
 		}
 	}
