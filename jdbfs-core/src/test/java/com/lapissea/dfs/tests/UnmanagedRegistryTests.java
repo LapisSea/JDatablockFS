@@ -14,12 +14,14 @@ import com.lapissea.dfs.objects.Blob;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOHashSet;
+import com.lapissea.dfs.objects.collections.IOList;
+import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.objects.collections.IOTreeSet;
 import com.lapissea.dfs.objects.collections.LinkedIOList;
-import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -30,7 +32,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class UnmanagedRegistryTests{
 	@Test
@@ -57,10 +60,25 @@ public class UnmanagedRegistryTests{
 		}
 	}
 	@Test
+	public void aSourceIsOwnedByOneClusterForItsLifetime() throws Exception{
+		var source  = MemoryData.empty();
+		var cluster = Cluster.init(source);
+		
+		assertThat(source.getUnmanagedRegistry()).isSameAs(cluster.getUnmanagedRegistry());
+		assertThatThrownBy(() -> new Cluster(source))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("already owned");
+		
+		IOMap<String, Integer> map = cluster.roots().builder("map").withType(HashIOMap.class, String.class, Integer.class).request();
+		map.put("a", 1);
+		assertThat(map.get("a")).isEqualTo(1);
+		assertThat(map.size()).isEqualTo(1);
+	}
+	@Test
 	public void rollbackRefreshesRetainedListAndAllowsFurtherWrites() throws Exception{
-		var                       source  = MemoryData.empty();
-		var                       cluster = Cluster.init(source);
-		ContiguousIOList<Integer> list    = cluster.roots().builder("values").withType(ContiguousIOList.class, Integer.class).request();
+		var             source  = MemoryData.empty();
+		var             cluster = Cluster.init(source);
+		IOList<Integer> list    = cluster.roots().builder("values").withType(ContiguousIOList.class, Integer.class).request();
 		list.addAll(List.of(1, 2, 3));
 		var before = source.readAll();
 		try(var transaction = source.startTransaction()){
@@ -83,7 +101,10 @@ public class UnmanagedRegistryTests{
 		IOTreeSet<Integer>          tree    = cluster.roots().builder("tree").withType(IOTreeSet.class, Integer.class).request();
 		linked.addAll(List.of(1, 2, 3));
 		map.put(1, 10);
-		for(var value : List.of(1, 2, 3)){ hash.add(value); tree.add(value); }
+		for(var value : List.of(1, 2, 3)){
+			hash.add(value);
+			tree.add(value);
+		}
 		var before = cluster.getSource().readAll();
 		try(var tx = cluster.getSource().startTransaction()){
 			linked.set(0, 9);
@@ -91,8 +112,10 @@ public class UnmanagedRegistryTests{
 			linked.add(4);
 			map.put(1, 99);
 			map.put(4, 40);
-			hash.remove(2); hash.add(4);
-			tree.remove(2); tree.add(4);
+			hash.remove(2);
+			hash.add(4);
+			tree.remove(2);
+			tree.add(4);
 			assertThat(tree.contains(4)).isTrue();
 		}
 		assertThat(cluster.getSource().readAll()).isEqualTo(before);
@@ -100,12 +123,18 @@ public class UnmanagedRegistryTests{
 		for(int i = 0; i<3; i++) assertThat(linked.get(i)).isEqualTo(i + 1);
 		assertThat(map.get(1)).isEqualTo(10);
 		assertThat(map.size()).isEqualTo(1);
-		assertThat(hash.contains(2)).isTrue(); assertThat(hash.contains(4)).isFalse();
-		assertThat(tree.contains(2)).isTrue(); assertThat(tree.contains(4)).isFalse();
-		linked.add(5); map.put(5, 50); hash.add(5); tree.add(5);
+		assertThat(hash.contains(2)).isTrue();
+		assertThat(hash.contains(4)).isFalse();
+		assertThat(tree.contains(2)).isTrue();
+		assertThat(tree.contains(4)).isFalse();
+		linked.add(5);
+		map.put(5, 50);
+		hash.add(5);
+		tree.add(5);
 		assertThat(linked.get(3)).isEqualTo(5);
 		assertThat(map.get(5)).isEqualTo(50);
-		assertThat(hash.contains(5)).isTrue(); assertThat(tree.contains(5)).isTrue();
+		assertThat(hash.contains(5)).isTrue();
+		assertThat(tree.contains(5)).isTrue();
 	}
 	@Test
 	public void rolledBackAllocationLosesIdentity() throws Exception{
@@ -247,15 +276,17 @@ public class UnmanagedRegistryTests{
 		var source   = provider.getSource();
 		var view = new IOInterface(){
 			@Override
-			public boolean isReadOnly()                    { return true; }
+			public boolean isReadOnly(){ return true; }
 			@Override
-			public IOTransaction startTransaction()        { return IOTransaction.NOOP; }
+			public IOTransaction startTransaction(){ return IOTransaction.NOOP; }
 			@Override
-			public RandomIO io() throws IOException        { return source.readOnlyIO(); }
+			public RandomIO io() throws IOException{ return source.readOnlyIO(); }
 			@Override
-			public IOTransactionState.Access lockIO()      { return source.lockIO(); }
+			public IOTransactionState.Access lockIO(){ return source.lockIO(); }
 			@Override
 			public UnmanagedRegistry getUnmanagedRegistry(){ return source.getUnmanagedRegistry(); }
+			@Override
+			public UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){ return source.claimUnmanagedRegistry(readOnly); }
 		};
 		var reader = DataProvider.newVerySimpleProvider(view);
 		assertThat(reader.getUnmanagedRegistry()).isSameAs(provider.getUnmanagedRegistry());
@@ -307,7 +338,10 @@ public class UnmanagedRegistryTests{
 		assertThat(blob.readAll()).isEmpty();
 		assertThatThrownBy(() -> list.get(0)).hasMessageContaining("no longer has");
 		blob.write(0, false, new byte[]{(byte)255});
-		try(var io = blob.io()){ assertThat(io.read()).isEqualTo(255); assertThat(io.read()).isEqualTo(-1); }
+		try(var io = blob.io()){
+			assertThat(io.read()).isEqualTo(255);
+			assertThat(io.read()).isEqualTo(-1);
+		}
 	}
 	
 	@IOValue
@@ -343,7 +377,10 @@ public class UnmanagedRegistryTests{
 		var provider = ephemeralCluster(source);
 		assertThat(source.getUnmanagedRegistry().size()).isPositive();
 		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-		while(provider.get() != null && System.nanoTime()<deadline){ System.gc(); Thread.sleep(20); }
+		while(provider.get() != null && System.nanoTime()<deadline){
+			System.gc();
+			Thread.sleep(20);
+		}
 		assertThat(provider.get()).isNull();
 		assertThat(source.getUnmanagedRegistry().size()).isZero();
 	}

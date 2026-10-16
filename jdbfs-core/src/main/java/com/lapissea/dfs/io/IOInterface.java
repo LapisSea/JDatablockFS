@@ -17,10 +17,9 @@ import java.io.IOException;
  * This interface is a container or accessor of binary data that can provide a way to write/read contents in a random or sequential manner.
  */
 public interface IOInterface extends RandomIO.Creator{
-	/**
-	 * Canonical weak identities shared by every provider over this source.
-	 */
-	default UnmanagedRegistry getUnmanagedRegistry(){ throw new UnsupportedOperationException("Source does not support unmanaged identities"); }
+	
+	UnmanagedRegistry getUnmanagedRegistry();
+	UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly);
 	
 	final class Builder{
 		private File    file;
@@ -158,6 +157,8 @@ public interface IOInterface extends RandomIO.Creator{
 			public long getTransactionVersion(){ return IOInterface.this.getTransactionVersion(); }
 			@Override
 			public UnmanagedRegistry getUnmanagedRegistry(){ return IOInterface.this.getUnmanagedRegistry(); }
+			@Override
+			public UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){ return IOInterface.this.claimUnmanagedRegistry(true); }
 			@Override
 			public IOTransactionState.Access lockIO(){ return IOInterface.this.lockIO(); }
 			@Override

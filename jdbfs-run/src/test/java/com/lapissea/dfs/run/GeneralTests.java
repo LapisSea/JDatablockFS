@@ -85,7 +85,7 @@ public class GeneralTests{
 	void chunkHeadIntegrity(long capacity) throws IOException{
 		var provider     = TestUtils.testChunkProvider(capacity);
 		var chunk        = AllocateTicket.bytes(capacity).submit(provider);
-		var providerRead = DataProvider.newVerySimpleProvider(provider.getSource());
+		var providerRead = DataProvider.newVerySimpleProvider(MemoryData.of(provider.getSource().readAll()));
 		var readChunk    = providerRead.getChunk(chunk.getPtr());
 		
 		assertThat(readChunk).isEqualTo(chunk);

@@ -277,16 +277,15 @@ public class WalFaultInjectionTests{
 			// Open a new IO/provider against only persisted bytes, including real WAL replay.
 			var recoveredController = new Controller(main, wal, seed);
 			try(var source = new FaultIO(name, recoveredController, false)){
-				var actual = readValues(source);
+				ContiguousIOList<Integer> list = Cluster.initOrOpen(source).roots().request("values", ContiguousIOList.class, Integer.class);
+				var                       actual = new ArrayList<Integer>();
+				for(int i = 0; i<list.size(); i++) actual.add(list.get(i));
 				assertThat(actual.equals(acknowledged) || actual.equals(inFlight))
 					.as("seed=%s cutoff=%s event=%s phase=%s acknowledged=%s inFlight=%s actual=%s",
 					    seed, cutoff, controller.event, controller.lastEvent, acknowledged, inFlight, actual).isTrue();
 				assertThat(wal.stable).isEmpty();
 				// Recovery is idempotent, and the recovered database remains writable.
-				source.openIOTransaction(() -> {
-					ContiguousIOList<Integer> list = new Cluster(source).roots().request("values", ContiguousIOList.class, Integer.class);
-					list.add(12345);
-				});
+				source.openIOTransaction(() -> list.add(12345));
 				source.checkpoint();
 			}
 			try(var source = new FaultIO(name, new Controller(main, wal, seed), false)){

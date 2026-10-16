@@ -70,9 +70,18 @@ public final class VaryingSize implements Stringify{
 	
 	private static IOInterface makeFakeData(){
 		return new IOInterface(){
-			private final UnmanagedRegistry registry = new UnmanagedRegistry(this);
+			private UnmanagedRegistry registry;
 			@Override
 			public UnmanagedRegistry getUnmanagedRegistry(){ return registry; }
+			@Override
+			public UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){
+				var r = registry;
+				if(r != null){
+					if(readOnly) return r;
+					throw new IllegalStateException("Fake source is already owned by a database");
+				}
+				return registry = new UnmanagedRegistry(this);
+			}
 			@Override
 			public boolean isReadOnly(){ return false; }
 			@Override

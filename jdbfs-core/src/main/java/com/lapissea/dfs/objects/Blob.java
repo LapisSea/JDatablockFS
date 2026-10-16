@@ -1,8 +1,8 @@
 package com.lapissea.dfs.objects;
 
-import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
@@ -43,7 +43,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public void setSize(long requestedSize) throws IOException{
 			if(requestedSize<0) throw new IllegalArgumentException();
-
+			
 			var cap = getCapacity();
 			data.setSize(Math.min(cap, requestedSize));
 		}
@@ -163,7 +163,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 	
 	
 	private UnmanagedRegistry contentsRegistry;
-
+	
 	public static Blob request(DataProvider provider, long capacity) throws IOException{
 		return provider.getSource().openIOTransaction(() -> {
 			var ch = AllocateTicket.bytes(capacity).submit(provider);
@@ -185,7 +185,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 	@Override
 	public IOTransaction startTransaction(){
 		var provider = getDataProvider();
-		var source = provider.getSource();
+		var source   = provider.getSource();
 		try(var ioAccess = source.lockIO()){
 			return source.startTransaction();
 		}
@@ -193,12 +193,21 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 	
 	@Override
 	public UnmanagedRegistry getUnmanagedRegistry(){
+		try(var ignored = lockIO()){ return contentsRegistry; }
+	}
+	@Override
+	public UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){
 		try(var ignored = lockIO()){
-			if(contentsRegistry == null){
-				contentsRegistry = new UnmanagedRegistry(this);
-				getDataProvider().getUnmanagedRegistry().registerChild(contentsRegistry);
+			var registry = contentsRegistry;
+			if(registry != null){
+				if(readOnly) return registry;
+				throw new IllegalStateException("Blob is already owned by another database");
 			}
-			return contentsRegistry;
+			registry = new UnmanagedRegistry(this);
+			// A blob database is nested inside the provider transaction. Its identities must rolled back with the outer database
+			getDataProvider().getUnmanagedRegistry().registerChild(registry);
+			contentsRegistry = registry;
+			return registry;
 		}
 	}
 	@Override
@@ -207,7 +216,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 	public IOTransactionState.Access lockIO(){ return getDataProvider().getSource().lockIO(); }
 	@Override
 	public void checkTransactionVersion(long expected){ getDataProvider().getSource().checkTransactionVersion(expected); }
-
+	
 	@Override
 	public RandomIO io() throws IOException{
 		return new BlobIO();

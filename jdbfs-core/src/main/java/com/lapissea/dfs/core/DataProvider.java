@@ -29,20 +29,25 @@ public interface DataProvider{
 	}
 	
 	class VerySimple implements DataProvider{
-		private final IOTypeDB      typeDB        = new IOTypeDB.MemoryOnlyDB.Synchronized();
-		private final ChunkCache    cache         = new ChunkCache();
-		private final MemoryManager memoryManager = new VerySimpleMemoryManager(this);
-		private final IOInterface   data;
-		private final long          transactionVersion;
+		private final IOTypeDB          typeDB        = new IOTypeDB.MemoryOnlyDB.Synchronized();
+		private final ChunkCache        cache         = new ChunkCache();
+		private final MemoryManager     memoryManager = new VerySimpleMemoryManager(this);
+		private final IOInterface       data;
+		private final UnmanagedRegistry unmanagedRegistry;
+		private final long              transactionVersion;
 		
 		public VerySimple(IOInterface data){
 			this.data = data;
 			transactionVersion = data.getTransactionVersion();
-			data.getUnmanagedRegistry().registerProvider(this);
+			unmanagedRegistry = data.claimUnmanagedRegistry(data.isReadOnly());
+			unmanagedRegistry.registerProvider(this);
 		}
 		
 		@Override
 		public void checkValid(){ data.checkTransactionVersion(transactionVersion); }
+		
+		@Override
+		public UnmanagedRegistry getUnmanagedRegistry(){ return unmanagedRegistry; }
 		
 		@Override
 		public IOTypeDB getTypeDb(){
@@ -196,6 +201,8 @@ public interface DataProvider{
 			
 			@Override
 			public IOTypeDB getTypeDb(){ return DataProvider.this.getTypeDb(); }
+			@Override
+			public UnmanagedRegistry getUnmanagedRegistry(){ return DataProvider.this.getUnmanagedRegistry(); }
 			@Override
 			public IOInterface getSource(){ return DataProvider.this.getSource(); }
 			@Override

@@ -431,9 +431,9 @@ public abstract class CursorIOData implements IOInterface{
 	private final    boolean readOnly;
 	private volatile boolean closed;
 	
-	private final UnmanagedRegistry   unmanagedRegistry = new UnmanagedRegistry(this);
-	private final IOTransactionState  transactions      = new IOTransactionState(this);
-	private final IOTransactionBuffer transactionBuff   = transactions.buffer();
+	private       UnmanagedRegistry   unmanagedRegistry;
+	private final IOTransactionState  transactions    = new IOTransactionState(this);
+	private final IOTransactionBuffer transactionBuff = transactions.buffer();
 	
 	public CursorIOData(IOHook hook, boolean readOnly){
 		this.readOnly = readOnly;
@@ -442,6 +442,15 @@ public abstract class CursorIOData implements IOInterface{
 	
 	@Override
 	public final UnmanagedRegistry getUnmanagedRegistry(){ return unmanagedRegistry; }
+	@Override
+	public final synchronized UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){
+		var registry = unmanagedRegistry;
+		if(registry != null){
+			if(readOnly) return registry;
+			throw new IllegalStateException("Source is already owned by another database");
+		}
+		return unmanagedRegistry = new UnmanagedRegistry(this);
+	}
 	
 	protected void markClosed(){ closed = true; }
 	

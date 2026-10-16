@@ -58,10 +58,11 @@ public final class IOTransactionState{
 				if(parent != null) return;
 				owner = null;
 				
+				var registry = target.getUnmanagedRegistry();
 				if(failed){
 					buffer.reset();
 					try{
-						target.getUnmanagedRegistry().rollback();
+						if(registry != null) registry.rollback();
 					}catch(IOException|RuntimeException|Error e){
 						physicalCommitFailed(e);
 						throw e;
@@ -73,7 +74,7 @@ public final class IOTransactionState{
 				}else{
 					try{
 						target.applyTransaction(buffer.export());
-						target.getUnmanagedRegistry().committed();
+						if(registry != null) registry.committed();
 					}catch(IOException|RuntimeException|Error e){
 						physicalCommitFailed(e);
 						throw e;
@@ -81,7 +82,10 @@ public final class IOTransactionState{
 				}
 			}finally{
 				if(parent == null){
-					if(commitFailure != null) target.getUnmanagedRegistry().committed();
+					if(commitFailure != null){
+						var registry = target.getUnmanagedRegistry();
+						if(registry != null) registry.committed();
+					}
 					owner = null;
 					failed = false;
 				}
@@ -169,7 +173,8 @@ public final class IOTransactionState{
 			var scope = new Scope(top);
 			if(top == null){
 				owner = Thread.currentThread();
-				target.getUnmanagedRegistry().begin();
+				var registry = target.getUnmanagedRegistry();
+				if(registry != null) registry.begin();
 			}
 			return top = scope;
 		}catch(Throwable e){

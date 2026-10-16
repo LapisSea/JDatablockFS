@@ -1,10 +1,12 @@
 package com.lapissea.dfs.run.repro;
 
 import com.lapissea.dfs.config.GlobalConfig;
+import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.FileRandomAccessData;
+import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -34,6 +36,14 @@ public class FileCopyTests{
 		
 		final List<Integer> writeSizes = new ArrayList<>();
 		
+		@Override
+		public UnmanagedRegistry getUnmanagedRegistry(){
+			throw NotImplementedException.infer();
+		}
+		@Override
+		public UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){
+			throw NotImplementedException.infer();
+		}
 		@Override
 		public boolean isReadOnly(){
 			return false;

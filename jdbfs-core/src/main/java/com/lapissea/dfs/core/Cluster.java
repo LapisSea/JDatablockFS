@@ -299,9 +299,10 @@ public final class Cluster implements DataProvider{
 	
 	private final ChunkCache chunkCache = new ChunkCache();
 	
-	private final IOInterface   source;
-	private final long          transactionVersion;
-	private final MemoryManager memoryManager;
+	private final IOInterface       source;
+	private final UnmanagedRegistry unmanagedRegistry;
+	private final long              transactionVersion;
+	private final MemoryManager     memoryManager;
 	
 	private final RootRef  root;
 	private final Metadata metadata;
@@ -310,6 +311,7 @@ public final class Cluster implements DataProvider{
 	
 	public Cluster(IOInterface source) throws IOException{
 		this.source = source;
+		unmanagedRegistry = source.claimUnmanagedRegistry(source.isReadOnly());
 		transactionVersion = source.getTransactionVersion();
 		source.read(MagicID::read);
 		
@@ -330,7 +332,7 @@ public final class Cluster implements DataProvider{
 		
 		memoryManager = new PersistentMemoryManager(this, getFirstFreeChunkPointer(), this::setFirstFreeChunkPointer);
 		
-		source.getUnmanagedRegistry().registerProvider(this);
+		unmanagedRegistry.registerProvider(this);
 		if(GlobalConfig.TYPE_VALIDATION){
 			scanTypeDB();
 		}
@@ -433,8 +435,6 @@ public final class Cluster implements DataProvider{
 	public void refreshAfterRollback() throws IOException{
 		((Roots)roots).cacheClear();
 		metadata.db.clearCaches();
-		// The allocator free-chain root lives in a managed metadata field, so the rollback of the
-		// backing bytes does not restore the in-memory value. Re-read it before the allocator reloads.
 		var fresh = rootPipe().readNew(this, getFirstChunk(), null);
 		metadata.firstFreeChunk = fresh.metadata.firstFreeChunk;
 		memoryManager.refreshAfterRollback();
@@ -446,10 +446,9 @@ public final class Cluster implements DataProvider{
 		return metadata == null? null : metadata.db;
 	}
 	@Override
-	public IOInterface getSource(){
-		checkValid();
-		return source;
-	}
+	public IOInterface getSource(){ return source; }
+	@Override
+	public UnmanagedRegistry getUnmanagedRegistry(){ return unmanagedRegistry; }
 	@Override
 	public MemoryManager getMemoryManager(){
 		checkValid();
