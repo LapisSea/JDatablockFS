@@ -30,12 +30,14 @@ final class OsProbe{
 	
 	record Answer(HostOs os, String evidence4K){ }
 	
+	private static final String VER_COMMAND = "ver";
+	
 	/**
-	 * @throws IOException when neither probe decides it, with how to set {@code os} explicitly
+	 * @throws IOException when neither probe decides the OS
 	 */
 	static Answer detect(RemoteConfig.Host host) throws IOException, InterruptedException{
 		ProbeResult uname = probe(host, "uname -s");
-		ProbeResult ver   = uname.stdout().filter(OsProbe::isPosix).isPresent()? null : probe(host, "cmd /c ver");
+		ProbeResult ver   = uname.stdout().filter(OsProbe::isPosix).isPresent()? null : probe(host, VER_COMMAND);
 		
 		var answer = decide(uname.stdout(), ver == null? Optional.empty() : ver.stdout());
 		if(answer.isEmpty()){
@@ -62,7 +64,7 @@ final class OsProbe{
 			return Optional.of(new Answer(HostOs.LINUX, "uname -s = Linux"));
 		}
 		if(ver.filter(OsProbe::isWindowsVersion).isPresent()){
-			return Optional.of(new Answer(HostOs.WINDOWS, "cmd /c ver = " + firstLine(ver.get())));
+			return Optional.of(new Answer(HostOs.WINDOWS, VER_COMMAND + " = " + firstLine(ver.get())));
 		}
 		return Optional.empty();
 	}

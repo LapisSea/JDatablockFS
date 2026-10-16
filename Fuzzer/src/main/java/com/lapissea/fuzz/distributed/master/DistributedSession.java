@@ -201,7 +201,7 @@ public final class DistributedSession{
 		try{
 			res = RemoteConfig.load();
 		}catch(Exception e){
-			System.err.println("Distributed fuzzer configuration unavailable: " + e);
+			new RuntimeException("Distributed fuzzer configuration unavailable!", e).printStackTrace();
 			res = new RemoteConfig.ConfigResult(new RemoteConfig(List.of()), null);
 		}
 		
