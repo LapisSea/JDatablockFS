@@ -46,7 +46,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.lang.reflect.Constructor;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -368,7 +369,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private Map<FieldSet<T>, Struct<T>> partialCache;
 	
 	private Struct<ProxyBuilder<T>> builderObjType;
-	private Constructor<T>          argsCtorCache;
+	private MethodHandle            argsCtorCache;
 	
 	private int hash = -1;
 	
@@ -1037,7 +1038,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public Struct<ProxyBuilder<T>> getBuilderObjType(boolean now){
 		var typ = builderObjType;
 		if(typ == null) typ = createBuilderObjType(now);
-		argsCtorCache = null;
 		return typ;
 	}
 	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
@@ -1104,37 +1104,48 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	T immutableDeepClone(T toCopy){
-		builderCopy:
-		{
-			var builderTyp = builderObjType;
-			if(builderTyp == null) break builderCopy;
-			return builderClone(toCopy, builderTyp);
-		}
-		return reflectionClone(toCopy);
-	}
-	
-	private T reflectionClone(T toCopy){
 		FieldSet<T> fields = getRealFields();
 		Object[]    values = new Object[fields.size()];
 		for(int i = 0; i<fields.size(); i++){
-			IOField<T, ?> field  = fields.get(i);
-			var           copied = makeCopyValue(toCopy, field);
-			values[i] = copied;
+			values[i] = makeCopyValue(toCopy, fields.get(i));
 		}
-		var types = getRealFields().mapped(IOField::getType).toArray(Class[]::new);
-		try{
-			var ctor = argsCtorCache == null? argsCtorCache = getType().getConstructor(types) : argsCtorCache;
-			return ctor.newInstance(values);
-		}catch(Throwable e){
-			Log.warn("Failed to do reflection based clone for {}#red. Trying builder clone...", this);
-			return builderClone(toCopy, getBuilderObjType(false));
-		}
+		return constructFromFields(values);
 	}
-	private static <T extends IOInstance<T>> T builderClone(T toCopy, Struct<ProxyBuilder<T>> builderTyp){
-		var builder = builderTyp.make();
-		builder.copyFrom(toCopy);
-		builder = builder.clone();//deep clone fields
-		return builder.build();
+	
+	@SuppressWarnings("unchecked")
+	T constructFromFields(Object[] values){
+		var    ctor = fieldsConstructor();
+		Object instance;
+		try{
+			instance = ctor.invokeExact(values);
+		}catch(Throwable e){
+			throw new RuntimeException(Log.fmt("Failed to construct {}#red from its fields", this), e);
+		}
+		return (T)instance;
+	}
+	
+	/**
+	 * @return a constructor taking every real field in field order, spread from an {@code Object[]}
+	 */
+	private MethodHandle fieldsConstructor(){
+		var ctor = argsCtorCache;
+		if(ctor != null) return ctor;
+		
+		var concrete = getConcreteType();
+		var types    = getRealFields().mapped(IOField::getType).toArray(Class[]::new);
+		try{
+			var reflected = concrete.getDeclaredConstructor(types);
+			var mode      = Modifier.isPrivate(reflected.getModifiers())? Access.Mode.PRIVATE : Access.Mode.PACKAGE;
+			ctor = Access.findAccess(concrete, mode).unreflect(reflected);
+		}catch(NoSuchMethodException e){
+			throw new MalformedStruct("fmt", "{}#red has final fields but no constructor taking all fields in order: {}#red", this, Arrays.toString(types));
+		}catch(IllegalAccessException e){
+			throw new RuntimeException(Log.fmt("No access to the field constructor of {}#red", this), e);
+		}
+		
+		ctor = ctor.asSpreader(Object[].class, types.length)
+		           .asType(MethodType.methodType(Object.class, Object[].class));
+		return argsCtorCache = ctor;
 	}
 	
 	@SuppressWarnings("unchecked")

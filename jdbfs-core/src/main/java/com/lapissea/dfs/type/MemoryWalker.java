@@ -4,6 +4,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.AverageDouble;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.field.IOField;
@@ -580,14 +581,23 @@ public class MemoryWalker{
 			return instance;
 		}
 		
-		var builderStruct = instanceStruct.getBuilderObjType(false);
+		var fields = instanceStruct.getRealFields();
+		var values = new Object[fields.size()];
 		
-		var builder = builderStruct.make();
-		builder.copyFrom(instance);
-		//noinspection unchecked
-		var f = builderStruct.getFields().requireExact((Class<Object>)field.getType(), field.getName());
-		f.set(null, builder, val);
-		return builder.build();
+		var found = false;
+		for(int i = 0; i<values.length; i++){
+			var f = fields.get(i);
+			if(f == field){
+				values[i] = val;
+				found = true;
+			}else{
+				values[i] = f.get(null, instance);
+			}
+		}
+		if(!found){
+			throw new IllegalArgumentException(Log.fmt("{}#red not a real field of {}#red", field, instanceStruct));
+		}
+		return instanceStruct.constructFromFields(values);
 	}
 	
 	private static final IOField<Chunk, ChunkPointer> CH_NEXT_PTR = Chunk.STRUCT.getFields().requireExact(ChunkPointer.class, "nextPtr");
