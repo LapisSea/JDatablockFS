@@ -8,16 +8,31 @@ import com.lapissea.jorth.lang.type.TypeSource;
 public final class ClassName{
 	
 	public static ClassName of(Class<?> t){
-		return dotted(t.getName());
+		return new ClassName(t.getName(), null);
 	}
 	
 	public static ClassName dotted(String s){
-		if(s.indexOf('/') != -1) throw new IllegalArgumentException(s);
+		checkValid(s, '/');
 		return new ClassName(s, null);
+	}
+	private static void checkValid(String s, char c){
+		if(s.isEmpty()){
+			throw new IllegalArgumentException("Class name can't be empty");
+		}
+		int index = 0;
+		while(true){
+			int i = s.indexOf(c, index);
+			if(i == -1) break;
+			if(i>0 && s.charAt(i - 1) == '\\'){
+				index = i + 1;
+				continue;//Ok nvm, it's escaped
+			}
+			throw new IllegalArgumentException(s);
+		}
 	}
 	
 	public static ClassName slashed(String s){
-		if(s.indexOf('.') != -1) throw new IllegalArgumentException(s);
+		checkValid(s, '.');
 		return new ClassName(null, s);
 	}
 	
@@ -75,7 +90,7 @@ public final class ClassName{
 	
 	@Override
 	public String toString(){
-		return dotted();
+		return GenericType.of(this).toString();
 	}
 	
 	@Override

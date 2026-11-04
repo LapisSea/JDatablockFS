@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
@@ -11,16 +12,19 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, float[]>{
+public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, float[]> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<float[]>{
@@ -89,5 +93,22 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCo
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = arraySize.getValue(ioPool, instance);
 		src.skipExact(size*4L);
+	}
+	
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(arraySize, args);
+			args.cast(long.class).mul(Float.BYTES);
+		});
+	}
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			bod.get("src")
+			   .call("readFloats4", args -> {
+				   accessMap.get(arraySize, args);
+			   });
+		});
 	}
 }

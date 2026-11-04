@@ -2,26 +2,18 @@ package com.lapissea.dfs.type.field.fields;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldBooleanArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldByteArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldByteBuffer;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldDirectType;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicInlineObject;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldEnumCollection;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldFloatArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldIntArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldIntegerArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
-import com.lapissea.dfs.type.field.fields.reflection.InstanceCollection;
+import com.lapissea.dfs.type.field.fields.reflection.*;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.util.List;
 
@@ -30,7 +22,7 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
 	permits IOFieldBooleanArray, IOFieldByteArray, IOFieldByteBuffer, IOFieldDirectType, IOFieldDynamicInlineObject, IOFieldEnumCollection, IOFieldFloatArray, IOFieldInlineObject, IOFieldInlineSealedObject, IOFieldIntArray, IOFieldIntegerArray, IOFieldWrapper, InstanceCollection.InlineField{
 	
-	private IOFieldPrimitive.FBoolean<T> isNull;
+	protected IOFieldPrimitive.FBoolean<T> isNull;
 	
 	protected NullFlagCompanyField(FieldAccessor<T> accessor){
 		super(accessor);
@@ -64,10 +56,45 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 	
 	protected final boolean getIsNull(VarPool<T> ioPool, T instance){
 		if(DEBUG_VALIDATION){
-			if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
+			badCallCheck();
 		}
-		
 		return isNull.getValue(ioPool, instance);
 	}
+	private void badCallCheck(){
+		if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
+	}
 	
+	public void injectReadFieldNullable(CodeBlock body, SpecializedGenerator.AccessMap accessMap, CodeArg skip, CodeArg readParsed) throws MalformedJorth, UnsupportedCodeGenType{
+		accessMap.set(getAccessor(), body, bod -> {
+			if(nullable()){
+				accessMap.get(isNull, body);
+				body.ifTrue(b -> {
+					if(skip != null){
+						skip.accept(b);
+					}
+					b.nullVal(getType());
+				}).elseRun(readParsed);
+			}else{
+				readParsed.accept(bod);
+			}
+		});
+	}
+
+	/** The writer consumes the non-null field value from the operand stack. */
+	protected final void injectWriteFieldNullable(CodeBlock body, SpecializedGenerator.AccessMap accessMap, CodeArg whenNull, CodeArg writer) throws MalformedJorth{
+		accessMap.getValue(this, body);
+		if(nullable()){
+			var value = accessMap.temporaryLocalField(getType(), "writeValue", body);
+			body.set(value).get(value).nullVal(getType()).ifEquality(empty -> {
+				if(whenNull != null) whenNull.accept(empty);
+			}).elseRun(present -> {
+				present.get(value);
+				accessMap.markTemporary();
+				writer.accept(present);
+				accessMap.dropTemporary(present);
+			});
+		}else{
+			writer.accept(body);
+		}
+	}
 }

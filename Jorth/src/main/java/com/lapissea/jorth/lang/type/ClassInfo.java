@@ -2,14 +2,14 @@ package com.lapissea.jorth.lang.type;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
-import com.lapissea.jorth.lang.info.FunctionInfo;
-import com.lapissea.jorth.lang.info.FunctionInfo.Signature;
-import com.lapissea.util.NotImplementedException;
+import com.lapissea.jorth.lang.FunctionInfo;
+import com.lapissea.jorth.lang.FunctionInfo.Signature;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,28 +33,24 @@ public interface ClassInfo{
 		}
 		
 		@Override
-		public FieldInfo getField(String name){
-			throw NotImplementedException.infer();//TODO: implement OfArray.getField()
+		public FieldInfo getField(String name) throws MalformedJorth{
+			throw new MalformedJorth("Array type has no field: " + name);
 		}
 		@Override
 		public FunctionInfo getFunction(Signature signature) throws MalformedJorth{
 			return base.getFunction(signature);
 		}
 		@Override
-		public Stream<FunctionInfo> getFunctionsByName(String name){
-			throw NotImplementedException.infer();//TODO: implement OfArray.getFunctionsByName()
-		}
-		@Override
-		public Stream<? extends FunctionInfo> getFunctions(){
-			throw NotImplementedException.infer();//TODO: implement OfArray.getFunctions()
+		public Stream<? extends FunctionInfo> getFunctionsByName(String name){
+			return base.getFunctionsByName(name);
 		}
 		@Override
 		public ClassName name(){
 			return component.raw();
 		}
 		@Override
-		public ClassInfo superType(){
-			throw NotImplementedException.infer();//TODO: implement OfArray.superType()
+		public ClassInfo superType() throws MalformedJorth{
+			return base;
 		}
 		@Override
 		public ClassType type(){
@@ -65,15 +61,19 @@ public interface ClassInfo{
 			return false;
 		}
 		@Override
+		public boolean isInterface(){
+			return false;
+		}
+		@Override
+		public boolean isPublic(){
+			return true;
+		}
+		@Override
 		public boolean isFinal(){
-			throw NotImplementedException.infer();//TODO: implement OfArray.isFinal()
+			return true;
 		}
 		@Override
 		public List<GenericType> interfaces(){
-			return List.of();
-		}
-		@Override
-		public List<Enum<?>> enumConstantNames(){
 			return List.of();
 		}
 	}
@@ -127,6 +127,7 @@ public interface ClassInfo{
 			Method method = null;
 			try{
 				method = getDeepDeclaredMethod(clazz, signature.name(), signature.args());
+				if(method == null) throw new ReflectiveOperationException("Could not find method");
 			}catch(ReflectiveOperationException e){
 				funs:
 				for(var info : findByName(signature.name())){
@@ -158,28 +159,6 @@ public interface ClassInfo{
 		}
 		
 		private boolean allFun;
-		@Override
-		public Stream<? extends FunctionInfo> getFunctions(){
-			if(allFun) return functions.values().stream();
-			
-			Arrays.stream(clazz.getDeclaredConstructors())
-			      .forEach(c -> functions.computeIfAbsent(
-				      new Signature("<init>", Arrays.stream(c.getGenericParameterTypes()).map(JType::of).toList()),
-				      m -> new FunctionInfo.OfConstructor(source, c)
-			      ));
-			
-			var c = clazz;
-			while(c != null){
-				Arrays.stream(c.getDeclaredMethods())
-				      .forEach(f -> {
-					      var sig = new Signature(f.getName(), Arrays.stream(f.getGenericParameterTypes()).map(JType::of).toList());
-					      functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
-				      });
-				c = c.getSuperclass();
-			}
-			
-			return functions.values().stream();
-		}
 		
 		private List<FunctionInfo> findByName(String name){
 			var result = new ArrayList<FunctionInfo>();
@@ -193,13 +172,17 @@ public interface ClassInfo{
 			queue.add(clazz);
 			while(!queue.isEmpty()){
 				var c = queue.pop();
-				Arrays.stream(c.getDeclaredMethods())
-				      .filter(f -> f.getName().equals(name))
-				      .forEach(f -> {
-					      var sig  = new Signature(name, Arrays.stream(f.getGenericParameterTypes()).map(JType::of).toList());
-					      var info = functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
-					      result.add(info);
-				      });
+				for(Method f : c.getDeclaredMethods()){
+					if(f.getName().equals(name)){
+						var         parms = f.getGenericParameterTypes();
+						List<JType> list  = new ArrayList<>(parms.length);
+						for(Type type : parms) list.add(JType.of(type));
+						
+						var sig  = new Signature(name, list);
+						var info = functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
+						result.add(info);
+					}
+				}
 				if(c.getSuperclass() != null) queue.add(c.getSuperclass());
 				queue.addAll(Arrays.asList(c.getInterfaces()));
 			}
@@ -207,11 +190,6 @@ public interface ClassInfo{
 			return List.copyOf(result);
 		}
 		
-		private ClassLoader getLoader(){
-			var loader = clazz.getClassLoader();
-			if(loader == null) loader = this.getClass().getClassLoader();
-			return loader;
-		}
 		private Method getDeepDeclaredMethod(@NotNull Class<?> type, String name, List<JType> args) throws ReflectiveOperationException{
 			var method = searchMethods(type.getDeclaredMethods(), name, args);
 			if(method != null){
@@ -235,13 +213,25 @@ public interface ClassInfo{
 			Method res = null;
 			for(Method m : methods){
 				if(m.getName().equals(name)
-				   && parameterTypes.equals(Arrays.stream(m.getParameterTypes()).map(JType::of).toList())
+				   && parametersMatch(parameterTypes, m)
 				   && (res == null
 				       || (res.getReturnType() != m.getReturnType()
 				           && res.getReturnType().isAssignableFrom(m.getReturnType()))))
 					res = m;
 			}
 			return res;
+		}
+		private static boolean parametersMatch(List<JType> parameterTypes, Method m){
+			if(m.getParameterCount() != parameterTypes.size()) return false;
+			var mParms = m.getParameterTypes();
+			for(int i = 0; i<mParms.length; i++){
+				var mParm      = JType.of(mParms[i]);
+				var targetParm = parameterTypes.get(i);
+				if(!mParm.equals(targetParm)){
+					return false;
+				}
+			}
+			return true;
 		}
 		private boolean checkArgs(Class<?>[] margs, List<JType> args, Throwable[] fail){
 			if(margs.length != args.size()) return false;
@@ -250,7 +240,8 @@ public interface ClassInfo{
 				var argS = args.get(i).asGeneric();
 				
 				if(argS.equals(GenericType.OBJECT)){
-					return argC == Object.class;
+					if(argC != Object.class) return false;
+					continue;
 				}
 				
 				var bt = BaseType.of(argC.getName());
@@ -291,6 +282,14 @@ public interface ClassInfo{
 			return clazz.isPrimitive();
 		}
 		@Override
+		public boolean isInterface(){
+			return clazz.isInterface();
+		}
+		@Override
+		public boolean isPublic(){
+			return Modifier.isPublic(clazz.getModifiers());
+		}
+		@Override
 		public boolean isFinal(){
 			return Modifier.isFinal(clazz.getModifiers());
 		}
@@ -306,27 +305,23 @@ public interface ClassInfo{
 		private List<Enum<?>> constants;
 		
 		@Override
-		public List<Enum<?>> enumConstantNames(){
-			if(constants == null){
-				var c = (Enum<?>[])clazz.getEnumConstants();
-				constants = c == null? List.of() : List.of(c);
-			}
-			return constants;
+		public String toString(){
+			return clazz.getName();
 		}
 	}
 	
 	FieldInfo getField(String name) throws MalformedJorth;
 	FunctionInfo getFunction(Signature signature) throws MalformedJorth;
 	Stream<? extends FunctionInfo> getFunctionsByName(String name);
-	Stream<? extends FunctionInfo> getFunctions();
 	
 	ClassName name();
 	ClassInfo superType() throws MalformedJorth;
 	ClassType type();
 	
 	boolean isPrimitive();
+	boolean isInterface();
 	
+	boolean isPublic();
 	boolean isFinal();
 	List<GenericType> interfaces();
-	List<Enum<?>> enumConstantNames();
 }

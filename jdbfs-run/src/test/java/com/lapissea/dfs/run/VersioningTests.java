@@ -9,9 +9,11 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.iterableplus.Iters;
-import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.util.LateInit;
 import org.testng.annotations.Test;
 
@@ -25,50 +27,37 @@ public class VersioningTests{
 	
 	public record Prop(String name, Class<?> type, Object val){ }
 	
-	private static void writeIOManagedClass(CodeStream code, String className, List<Prop> props) throws MalformedJorth{
-		code.addImports(IOInstance.Managed.class, IOValue.class);
-		code.write(
-			"""
-				extends #IOInstance.Managed<{0}>
-				public class {0} start
-				
-					template-for #val in {1} start
-						@ #IOValue
-						public field #val.name #val.type
-					end
-				
-					public function <init> start
-						super start end
-						template-for #val in {1} start
-							#val.val set this #val.name
-						end
-					end
-				end
-				""",
-			className, props
-		);
+	private static void writeIOManagedClass(ClassDefinition cw, String className, List<Prop> props) throws MalformedJorth{
+		cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(ClassName.dotted(className)));
+		cw.name(ClassName.dotted(className)).finalAcc();
+		for(Prop prop : props){
+			cw.field(prop.type, prop.name).annotation(IOValue.class);
+		}
+		
+		var init = cw.instanceInit().body()
+		             .callSuper(e -> { });
+		
+		for(Prop prop : props){
+			init.val(prop.val)
+			    .setThis(prop.name);
+		}
 	}
 	
 	private static final ClassLoader SHADOW_CL = TestUtils.makeShadowClassLoader(Map.of(
 		A.class.getName(), name -> {
-			return Jorth.generateClass(null, name, code -> {
-				writeIOManagedClass(code, name, List.of(
-					new Prop("a", int.class, 1)
-				));
-			});
+			var cw = new ClassDefinition(null);
+			writeIOManagedClass(cw, name, List.of(
+				new Prop("a", int.class, 1)
+			));
+			return cw.getClassFile();
 		},
 		TestNames.class.getName(), name -> {
-			return Jorth.generateClass(null, name, code -> {
-				code.write(
-					"""
-						public enum {!} start
-							enum FOO
-							enum John
-							enum BAR
-						end
-						""",
-					name);
-			});
+			var cw = new ClassDefinition(null);
+			cw.name(ClassName.dotted(name)).type(ClassType.ENUM);
+			cw.enumConstant("FOO");
+			cw.enumConstant("John");
+			cw.enumConstant("BAR");
+			return cw.getClassFile();
 		}
 	));
 	

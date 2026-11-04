@@ -16,6 +16,8 @@ import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.time.LocalTime;
@@ -99,5 +101,16 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends IOFie
 			size = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 		}
 		size.skip(src);
+	}
+	
+	@Override
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.call(LocalTime.class, "ofNanoOfDay", arg -> {
+			if(varSize != null){
+				varSize.size.readIntConst(arg, true);
+			}else{
+				arg.get("src").call("readInt8Dynamic");
+			}
+		});
 	}
 }

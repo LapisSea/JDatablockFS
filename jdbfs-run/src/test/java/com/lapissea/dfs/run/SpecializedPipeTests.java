@@ -1,0 +1,624 @@
+package com.lapissea.dfs.run;
+
+import com.lapissea.dfs.SyntheticParameterizedType;
+import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.config.GlobalConfig;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.LockedFlagSet;
+import com.lapissea.dfs.io.instancepipe.CheckedPipe;
+import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.objects.ObjectID;
+import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.StagedInit;
+import com.lapissea.dfs.type.SupportedPrimitive;
+import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
+import com.lapissea.dfs.type.field.Annotations;
+import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.annotations.IODependency;
+import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
+import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.fuzz.FuzzConfig;
+import com.lapissea.fuzz.FuzzingRunner;
+import com.lapissea.fuzz.FuzzingStateEnv;
+import com.lapissea.fuzz.Plan;
+import com.lapissea.fuzz.RunMark;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.ClassDefinition;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.function.UnsafeConsumer;
+import org.testng.IRetryAnalyzer;
+import org.testng.ITestResult;
+import org.testng.annotations.Test;
+
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.random.RandomGenerator;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class SpecializedPipeTests{
+//	@BeforeClass
+//	void before(){
+//		StandardStructPipe.of(Chunk.class, StructPipe.STATE_IO_FIELD);
+//	}
+	
+	private static final Annotation UNSIGNED = Annotations.make(IOValue.Unsigned.class);
+	
+	record FieldDef(String name, Class<?> type, boolean getter, boolean setter, boolean finalMod, List<Annotation> annotations,
+	                Function<RandomGenerator, Object> generator){
+		FieldDef(Class<?> type, Function<RandomGenerator, Object> generator){ this("val", type, false, false, false, List.of(), generator); }
+		
+		FieldDef withType(Class<?> type)                                    { return new FieldDef(name, type, getter, setter, finalMod, annotations, generator); }
+		FieldDef withGetter(boolean getter)                                 { return new FieldDef(name, type, getter, setter, finalMod, annotations, generator); }
+		FieldDef withSetter(boolean setter)                                 { return new FieldDef(name, type, getter, setter, finalMod, annotations, generator); }
+		FieldDef withAnnotations(List<Annotation> ann)                      { return new FieldDef(name, type, getter, setter, finalMod, ann, generator); }
+		FieldDef withNewAnnotations(Annotation... ann)                      { return withAnnotations(Iters.concat(annotations, Iters.from(ann)).toList()); }
+		FieldDef withGenerator(Function<RandomGenerator, Object> generator) { return new FieldDef(name, type, getter, setter, finalMod, annotations, generator); }
+		FieldDef withName(String name)                                      { return new FieldDef(name, type, getter, setter, finalMod, annotations, generator); }
+		FieldDef withFinalMod(boolean finalMod)                             { return new FieldDef(name, type, getter, setter, finalMod, annotations, generator); }
+		
+		@Override
+		public String toString(){
+			var res = new StringJoiner(", ", type.getTypeName() + "{", "}");
+			if(getter) res.add("withGet");
+			if(setter) res.add("withSet");
+			if(finalMod) res.add("finalMod");
+			Iters.from(annotations).joinAsOptionalStr(", ", "anns: [", "]", ann -> ann.annotationType().getSimpleName()).ifPresent(res::add);
+			return res.toString();
+		}
+	}
+	
+	@org.testng.annotations.DataProvider(parallel = true)
+	Object[][] fieldVariations(){
+		var all = fieldPermutations();
+		return all.flatMapArray(e -> new Object[][]{{e, true}, {e, false}}).toArray(Object[].class);
+	}
+	
+	private static IterablePP.SizedPP<FieldDef> fieldPermutations(){
+		IterablePP<FieldDef> doubles  = withFns(Iters.of(new FieldDef(double.class, RandomGenerator::nextDouble)));
+		IterablePP<FieldDef> chars    = withFns(Iters.of(new FieldDef(char.class, r -> (char)r.nextInt(255))));
+		IterablePP<FieldDef> floats   = withFns(Iters.of(new FieldDef(float.class, RandomGenerator::nextFloat)));
+		IterablePP<FieldDef> longs    = withFns(Iters.of(new FieldDef(long.class, RandomGenerator::nextLong)));
+		IterablePP<FieldDef> ints     = withFns(Iters.of(new FieldDef(int.class, RandomGenerator::nextInt)));
+		IterablePP<FieldDef> shorts   = withFns(Iters.of(new FieldDef(short.class, r -> (short)r.nextInt())));
+		IterablePP<FieldDef> bytes    = withFns(Iters.of(new FieldDef(byte.class, r -> (byte)r.nextInt())));
+		IterablePP<FieldDef> booleans = withFns(Iters.of(new FieldDef(boolean.class, RandomGenerator::nextBoolean)));
+		
+		longs = withUnsigned(longs, r -> r.nextLong(0, Long.MAX_VALUE));
+		ints = withUnsigned(ints, r -> r.nextInt(0, Integer.MAX_VALUE));
+		shorts = withUnsigned(shorts, r -> (short)r.nextInt(0, Short.MAX_VALUE));
+		
+		chars = withVirtualSize(chars);
+		longs = withVirtualSize(longs);
+		ints = withVirtualSize(ints);
+		shorts = withVirtualSize(shorts);
+		
+		var primitives = Iters.concat(
+//			bytes
+			doubles, chars, floats, longs, ints, shorts, bytes, booleans
+		);
+		
+		IterablePP<FieldDef> boxed = primitives.map(e -> e.withType(SupportedPrimitive.get(e.type).orElseThrow().wrapper));
+		boxed = withNullable(boxed);
+		
+		
+		IterablePP<FieldDef> strings = withFns(Iters.of(new FieldDef(String.class, r -> {
+			return r.ints(r.nextInt(1, 10), 'A', 'z').mapToObj(i -> ((char)i) + "").collect(Collectors.joining());
+		})));
+		
+		IterablePP<FieldDef> dynamic = withFns(Iters.of(new FieldDef(Object.class, r -> switch(r.nextInt(4)){
+			case 0 -> r.nextInt();
+			case 1 -> r.nextBoolean();
+			case 2 -> new Reference(ChunkPointer.of(r.nextInt(Integer.MAX_VALUE)), r.nextInt(Integer.MAX_VALUE));
+			case 3 -> new ObjectID.LID(r.nextLong());
+			default -> throw new NotImplementedException();
+		}).withAnnotations(List.of(Annotations.make(IOValue.Generic.class)))));
+		
+		IterablePP<FieldDef> directType = withFns(Iters.of(
+			new FieldDef(Class.class, r -> switch(r.nextInt(3)){
+				case 0 -> int.class;
+				case 1 -> List.class;
+				case 2 -> Reference.class;
+				default -> throw new NotImplementedException();
+			}),
+			new FieldDef(Type.class, r -> switch(r.nextInt(5)){
+				case 0 -> int.class;
+				case 1 -> List.class;
+				case 2 -> Reference.class;
+				case 3 -> SyntheticParameterizedType.of(List.class, List.of(ObjectID.class));
+				case 4 -> SyntheticParameterizedType.of(Map.class, List.of(ObjectID.class, Long.class));
+				default -> throw new NotImplementedException();
+			})
+		)).map(e -> e.withAnnotations(List.of(Annotations.make(IOUnsafeValue.class))));
+		
+		IterablePP<FieldDef> objects = Iters.concat(
+			strings, dynamic, directType
+		);
+		
+		objects = withNullable(objects);
+		
+		return Iters.concat(
+			primitives, boxed, objects
+		);
+	}
+	
+	private static IterablePP<FieldDef> withFns(IterablePP<FieldDef> combinations){
+		combinations = Iters.concat(
+			combinations.map(e -> e.withGetter(false)),
+			combinations.map(e -> e.withGetter(true))
+		);
+		combinations = Iters.concat(
+			combinations.map(e -> e.withSetter(false)),
+			combinations.map(e -> e.withSetter(true)),
+			combinations.map(e -> e.withFinalMod(true))
+		);
+		return combinations;
+	}
+	private static IterablePP<FieldDef> withUnsigned(IterablePP<FieldDef> combinations, Function<RandomGenerator, Object> generator){
+		return Iters.concat(
+			combinations.map(e -> e.withAnnotations(List.of())),
+			combinations.map(e -> e.withAnnotations(List.of(UNSIGNED))
+			                       .withGenerator(generator))
+		);
+	}
+	private static IterablePP<FieldDef> withVirtualSize(IterablePP<FieldDef> combinations){
+		return Iters.concat(
+			combinations,
+			combinations.map(e -> e.withNewAnnotations(Annotations.make(IODependency.VirtualNumSize.class)))
+		);
+	}
+	private static IterablePP<FieldDef> withNullable(IterablePP<FieldDef> combinations){
+		return Iters.concat(
+			combinations,
+			combinations.map(e -> {
+				var oldGen = e.generator;
+				return e.withNewAnnotations(Annotations.make(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE)))
+				        .withGenerator(r -> r.nextBoolean()? oldGen.apply(r) : null);
+			})
+		);
+	}
+	
+	public static class SoftRetry implements IRetryAnalyzer{
+		
+		private static final int maxRetryCount = 5;
+		
+		record Entry(String name, List<Object> args){ }
+		
+		private final Map<Entry, Integer> retryRecord = new ConcurrentHashMap<>();
+		
+		@Override
+		public boolean retry(ITestResult result){
+			if(!(result.getThrowable() instanceof AssertionError a && a.getMessage() != null && a.getMessage().contains("DEBUG_READY_READ"))){
+				return false;
+			}
+			var count = retryRecord.compute(new Entry(result.getName(), Arrays.asList(result.getParameters())), (k, v) -> {
+				if(v == null) v = 0;
+				if(v>=maxRetryCount) return v;
+				return ++v;
+			});
+			return count<maxRetryCount;
+		}
+	}
+	
+	@Test(groups = "specializedSimple")
+	void testChunk() throws IOException{
+		AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
+	}
+	@Test(dependsOnMethods = {"testChunk"}, groups = "specializedSimple")
+	void testRef() throws IOException{
+		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
+		
+		var refPipe = Reference.standardPipe();
+		var ref     = new Reference(ChunkPointer.of(10), 10);
+		refPipe.write(ch, ref);
+		
+	}
+	@Test(dependsOnMethods = "testRef", groups = "specializedSimple")
+	void implPipe() throws IOException{
+		
+		@StructPipe.Special
+		interface Test extends IOInstance.Def<Test>{
+			int val();
+		}
+		
+		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
+		try(var w = ch.write(0, true)){
+			w.writeInt4(69420);
+		}
+		
+		var pipe = StandardStructPipe.of(Test.class);
+		var test = pipe.readNew(ch, null);
+		assertThat(test.val()).isEqualTo(69420);
+	}
+	
+	@Test(groups = "specializedSimple")
+	void finalNonFinal() throws IOException, LockedFlagSet{
+		fieldsTest(List.of(
+			new FieldDef(double.class, RandomGenerator::nextDouble).withName("f1"),
+			new FieldDef(double.class, RandomGenerator::nextDouble).withFinalMod(true).withName("f2")
+		));
+	}
+	
+	@Test(groups = "specializedSimple")
+	void setAndFinal() throws IOException, LockedFlagSet{
+		fieldsTest(List.of(
+			new FieldDef(double.class, RandomGenerator::nextDouble).withSetter(true).withName("f1"),
+			new FieldDef(double.class, RandomGenerator::nextDouble).withFinalMod(true).withName("f2")
+		));
+	}
+	
+	private static <T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void fieldsTest(List<FieldDef> fields) throws LockedFlagSet, IOException{
+		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, 0);
+		
+		var rand = new RawRandom(1234);
+		
+		for(int i = 0; i<20; i++){
+			doIOTest(fields, pipes.basicPipe(), pipes.basicPipe(), rand);
+			doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), rand);
+		}
+	}
+	
+	private final Map<FieldDef, Integer> retries = new ConcurrentHashMap<>();
+	
+	@Test(groups = "specializedSimple")
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void boxedBooleanDuringAsyncInitialization() throws IOException, LockedFlagSet{
+		var fields = List.of(new FieldDef(Boolean.class, RandomGenerator::nextBoolean).withGetter(true).withFinalMod(true));
+		var random = new RawRandom(1234);
+		synchronized(ConfigDefs.OPTIMIZED_PIPE){
+			try(var ignore = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
+				for(int i = 0; i<32; i++){
+					// A single field bypasses dependency sorting, which otherwise waits for field descriptors.
+					BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, 15);
+					doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), random);
+					doIOTest(fields, pipes.specialPipe(), pipes.basicPipe(), random);
+				}
+			}
+		}
+	}
+
+	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnGroups = "specializedSimple")
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
+		LogUtil.println("Testing: " + field + (immediate? ", immediate" : ""));
+		
+		var                  fields = List.of(field);
+		BasicSpecial<T1, T2> pipes;
+		// Temporary flag values are process-wide; parallel cases must not restore another case's optimization mode
+		// while its pipes are being constructed
+		synchronized(ConfigDefs.OPTIMIZED_PIPE){
+			try(var ignore = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
+				pipes = makeBasicSpecial(fields, immediate? 0 : retries.compute(field, (k, c) -> c == null? 1 : c + 1)*15);
+			}
+		}
+		boolean debRead = getPipeFlag(pipes.specialPipe(), "DEBUG_READY_READ");
+		// The artificial initialization delay only runs with debug validation enabled.
+		if(GlobalConfig.DEBUG_VALIDATION || immediate){
+			assertThat(debRead).as("Pipe generation flag: DEBUG_READY_READ").isEqualTo(immediate);
+		}
+		
+		var random = new RawRandom();//field.toString().hashCode()
+		for(int i = 0; i<50; i++){
+			doIOTest(fields, pipes.basicPipe(), pipes.basicPipe(), random);
+			doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), random);
+			doIOTest(fields, pipes.specialPipe(), pipes.basicPipe(), random);
+		}
+	}
+	
+	@Test(dependsOnMethods = "testRef")
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void aBunchOfFlags() throws LockedFlagSet, IOException{
+		var fields = Iters.of(
+			new FieldDef(boolean.class, RandomGenerator::nextBoolean)
+		).repeat(25).enumerate((i, e) -> e.withName("val" + i)).toList();
+		
+		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, 0);
+		
+		doIOTest(fields, pipes.basicPipe(), pipes.basicPipe(), new RawRandom(0));
+		doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), new RawRandom(0));
+	}
+	
+	@Test(dependsOnMethods = "testType")
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void twoFieldsPermutations() throws LockedFlagSet, IOException{
+		var index     = new AtomicInteger(LocalDate.now().getDayOfYear());
+		var allFields = fieldPermutations().stream().map(e -> e.withName("" + index.incrementAndGet())).toList();
+		
+		List<FieldDef> fields;
+		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false);
+		    var ignore2 = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(false);
+		    var ignore3 = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
+			fields = allFields.parallelStream().flatMap(f1 -> {
+				var rand = new RawRandom(f1.name().hashCode());
+				return allFields.stream().filter(e -> rand.nextFloat()>0.8).map(f2 -> List.of(f1.withName("val1"), f2.withName("val2")));
+			}).filter(f1f2 -> {
+				var random = new RawRandom(f1f2.toString().hashCode());
+				try{
+					BasicSpecial<T1, T2> pipes;
+					try{
+						pipes = makeBasicSpecial(f1f2, 0);
+					}catch(UnsupportedOperationException e){
+						return false;
+					}catch(LockedFlagSet e){
+						throw new RuntimeException(e);
+					}
+					
+					for(int i = 0; i<20; i++){
+						doIOTest(f1f2, pipes.basicPipe(), pipes.basicPipe(), random);
+						doIOTest(f1f2, pipes.basicPipe(), pipes.specialPipe(), random);
+						doIOTest(f1f2, pipes.specialPipe(), pipes.basicPipe(), random);
+					}
+				}catch(Throwable e){
+					return true;
+				}
+				return false;
+			}).findFirst().orElse(null);
+			
+			if(fields == null){
+				return;
+			}
+		}
+		LogUtil.println(fields);
+		LogUtil.println(fields.hashCode());
+		
+		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, 0);
+		
+		doIOTest(fields, pipes.basicPipe(), pipes.basicPipe(), new RawRandom(0));
+		doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), new RawRandom(0));
+		
+	}
+	
+	sealed interface FieldAction{
+		record Add(int index) implements FieldAction{ }
+	}
+	
+	@Test(dependsOnMethods = {"testType", "aBunchOfFlags"})
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testMultiFuzz() throws LockedFlagSet{
+		var allFields = fieldPermutations().stream().toList();
+		var fuz = new FuzzingRunner<>(new FuzzingStateEnv.Marked<List<Integer>, FieldAction, Exception>(){
+			@Override
+			public void applyAction(List<Integer> ids, long actionIndex, FieldAction a, RunMark mark) throws Exception{
+				
+				switch(a){
+					case FieldAction.Add(var i) -> ids.add(i);
+				}
+				
+				var fields = Iters.from(ids).map(allFields::get).enumerate((i, e) -> e.withName("val" + i)).toList();
+				
+				if(mark.action(actionIndex)){
+					LogUtil.println("Failed on IDS:", ids);
+					LogUtil.println("Fields:\n" + Iters.from(fields).joinAsStr("\n", e -> "  " + e));
+					int i = 0;
+				}
+				
+				var random = new RawRandom(actionIndex*1234);
+				
+				BasicSpecial<T1, T2> pipes;
+				try{
+					pipes = makeBasicSpecial(fields, 0);
+				}catch(UnsupportedOperationException e){
+					return;
+				}
+				
+				for(int i = 0; i<20; i++){
+					doIOTest(fields, pipes.basicPipe(), pipes.basicPipe(), random);
+					doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), random);
+					doIOTest(fields, pipes.specialPipe(), pipes.basicPipe(), random);
+				}
+			}
+			@Override
+			public List<Integer> create(RandomGenerator random, long sequenceIndex, RunMark mark) throws Exception{
+				return new ArrayList<>();
+			}
+		}, rng -> {
+			return new FieldAction.Add(rng.nextInt(allFields.size()));
+		});
+
+//		fuz.runAndAssert("EhiCBS9IBUqHIAgGMR4");
+		
+		// Keep the global override active until all fuzz workers and reruns finish.
+		try(var integrityCheck = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false);
+		    var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(false);
+		    var ignore2 = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
+			FuzzingUtils.stableRun(Plan.start(fuz, new FuzzConfig().withErrorDelay(Duration.ofSeconds(60)), 123, 5_000, 30), "testMultiFuzz");
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> BasicSpecial<T1, T2> makeBasicSpecial(List<FieldDef> fields, int specialDelay) throws LockedFlagSet{
+		var basic   = (Class<T1>)makeFieldClass(fields, false, specialDelay);
+		var special = (Class<T2>)makeFieldClass(fields, true, specialDelay);
+		
+		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false)){
+			StructPipe<T1> basicPipe   = makeUncheckedPipe(basic, specialDelay == 0);
+			StructPipe<T2> specialPipe = makeUncheckedPipe(special, specialDelay == 0);
+			
+			if(ConfigDefs.OPTIMIZED_PIPE.resolve() != ConfigDefs.PipeOptimization.TRY_ALWAYS){
+				assertThat(basicPipe).isNotInstanceOf(StructPipe.SpecializedImplementation.class);
+			}
+			assertThat(specialPipe).isInstanceOf(StructPipe.SpecializedImplementation.class);
+			
+			return new BasicSpecial<>(basicPipe, specialPipe);
+		}
+	}
+	
+	private record BasicSpecial<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>>(StructPipe<T1> basicPipe, StructPipe<T2> specialPipe){ }
+	
+	private static <T2 extends IOInstance<T2>> boolean getPipeFlag(StructPipe<T2> specialPipe, String name){
+		boolean debRead;
+		try{
+			var debReadF = specialPipe.getClass().getDeclaredField(name);
+			debRead = (boolean)debReadF.get(null);
+		}catch(Throwable e){
+			throw new RuntimeException(Log.fmt("Failed to get {}#red flag", name), e);
+		}
+		return debRead;
+	}
+	private static <T1 extends IOInstance<T1>> StructPipe<T1> makeUncheckedPipe(Class<T1> basic, boolean imidiate){
+		StructPipe<T1> pipe = imidiate? StandardStructPipe.of(basic, StagedInit.STATE_DONE) : StandardStructPipe.of(basic);
+		if(pipe instanceof CheckedPipe.Standard<T1> ch){
+			return ch.getUncheckedPipe();
+		}
+		return pipe;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <TF extends IOInstance<TF>, TT extends IOInstance<TT>> void doIOTest(List<FieldDef> fieldsInfo, StructPipe<TF> from, StructPipe<TT> to, RandomGenerator random) throws IOException{
+		TF val;
+		
+		if(from.getType().needsBuilderObj()){
+			var              builder = from.getType().getBuilderObjType(true);
+			ProxyBuilder<TF> bVal    = builder.make();
+			for(FieldDef field : fieldsInfo){
+				var f1 = (IOField<ProxyBuilder<TF>, Object>)builder.getFields().byName(field.name).orElseThrow();
+				f1.set(null, bVal, field.generator.apply(random));
+			}
+			val = bVal.build();
+		}else{
+			val = from.getType().make();
+			for(FieldDef field : fieldsInfo){
+				var f1 = (IOField<TF, Object>)from.getType().getFields().byName(field.name).orElseThrow();
+				f1.set(null, val, field.generator.apply(random));
+			}
+		}
+		
+		
+		
+		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
+		from.write(ch, val);
+		TT readNew = to.readNew(ch, null);
+		TT doNew;
+		if(!to.getType().needsBuilderObj()){
+			doNew = to.getType().make();
+			try(var io = ch.io()){
+				to.read(ch.getDataProvider(), io, doNew, null);
+			}
+		}else doNew = null;
+		
+		for(FieldDef field : fieldsInfo){
+			
+			if(field.getter){
+				assert getIntField(val, field.name + "_getCount") != 0 : getIntField(val, field.name + "_getCount") + " != " + 0;
+				assert getIntField(readNew, field.name + "_getCount") == 0 : getIntField(readNew, field.name + "_getCount") + " == " + 0;
+			}
+			if(!to.getType().needsBuilderObj() && field.setter){
+				int orgSetCount = getIntField(val, field.name + "_setCount");
+				assert orgSetCount == 1 : orgSetCount + " == " + 1;
+				int rNewSetCount = getIntField(readNew, field.name + "_setCount");
+				assert rNewSetCount == 1 : rNewSetCount + " == " + 1;
+			}
+			
+			var f1 = (IOField<TF, Object>)from.getType().getFields().byName(field.name).orElseThrow();
+			var f2 = (IOField<TT, Object>)to.getType().getFields().byName(field.name).orElseThrow();
+			
+			var val1 = f1.get(null, val);
+			var val2 = f2.get(null, readNew);
+			
+			assertThat(val1).isEqualTo(val2);
+			
+			if(!to.getType().needsBuilderObj()){
+				var val3 = f2.get(null, doNew);
+				assertThat(val1).isEqualTo(val3);
+				assertThat(val2).isEqualTo(val3);
+			}
+		}
+	}
+	
+	private static int getIntField(Object val, String name){
+		try{
+			var f1 = val.getClass().getDeclaredField(name);
+			f1.setAccessible(true);
+			return (int)f1.get(val);
+		}catch(ReflectiveOperationException e){
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private static Class<IOInstance<?>> makeFieldClass(List<FieldDef> fieldDefs, boolean special, int specialDelay){
+		var fields = new ArrayList<TempClassGen.FieldGen>();
+		var fns    = new ArrayList<UnsafeConsumer<ClassDefinition, MalformedJorth>>();
+		for(FieldDef field : fieldDefs){
+			fields.add(new TempClassGen.FieldGen(
+				field.name, Visibility.PRIVATE, field.finalMod, field.type,
+				Iters.concat1N(Annotations.make(IOValue.class), field.annotations).toList(),
+				field.generator
+			));
+			
+			var upper = TextUtil.firstToUpperCase(field.name);
+			
+			if(field.getter){
+				var getCounterName = field.name + "_getCount";
+				fields.add(new TempClassGen.FieldGen(
+					getCounterName, Visibility.PRIVATE, false, int.class,
+					List.of(), null
+				));
+				fns.add(cw -> {
+					cw.function("get" + upper)
+					  .annotation(IOValue.class)
+					  .returns(field.type)
+					  .body()
+					  .getThis(getCounterName)
+					  .add(1)
+					  .setThis(getCounterName)
+					  .getThis(field.name);
+				});
+			}
+			if(field.setter){
+				var setCounter = field.name + "_setCount";
+				fields.add(new TempClassGen.FieldGen(
+					setCounter, Visibility.PRIVATE, false, int.class,
+					List.of(), null
+				));
+				fns.add(cw -> {
+					cw.function("set" + upper)
+					  .annotation(IOValue.class)
+					  .arg(field.type, "val")
+					  .body()
+					  .getThis(setCounter)
+					  .add(1)
+					  .setThis(setCounter)
+					  .get("val")
+					  .setThis(field.name);
+				});
+			}
+		}
+		
+		boolean hasFinal = fieldDefs.stream().anyMatch(e -> e.finalMod);
+		
+		List<Annotation> annotations = new ArrayList<>(2);
+		if(special) annotations.add(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", specialDelay)));
+		if(hasFinal) annotations.add(Annotations.makeVal(IOInstance.Order.class, fieldDefs.stream().map(FieldDef::name).toArray(String[]::new)));
+		
+		return TempClassGen.gen(new TempClassGen.ClassGen(
+			"unnamed",
+			fields,
+			Set.of(hasFinal?
+			       new TempClassGen.CtorType.Some(fieldDefs.stream().map(FieldDef::name).toList()) :
+			       new TempClassGen.CtorType.Empty()),
+			IOInstance.Managed.class,
+			annotations,
+			fns
+		));
+	}
+}

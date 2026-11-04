@@ -11,7 +11,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 
-public final class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
+public final class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp> implements FieldAccessor.FieldOrMethod{
 	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType){
 		return new ReflectionAccessor<>(struct, field, getter, setter, name, genericType);
@@ -37,6 +37,18 @@ public final class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 		if(this.getter != null) this.getter.setAccessible(true);
 		if(this.setter != null) this.setter.setAccessible(true);
 		field.setAccessible(true);
+	}
+	
+	@Override
+	public AccessType getter(){
+		if(getter != null) return new AccessType.Method(getter.getName());
+		return new AccessType.Field(field.getDeclaringClass(), field.getName());
+	}
+	@Override
+	public AccessType setter(){
+		if(setter != null) return new AccessType.Method(setter.getName());
+		if(isReadOnly()) throw new UnsupportedOperationException("Cannot make read-only field access for " + this);
+		return new AccessType.Field(field.getDeclaringClass(), field.getName());
 	}
 	
 	@Override

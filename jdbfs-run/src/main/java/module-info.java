@@ -7,6 +7,7 @@ module JDatablockFS.run {
 	requires jmh.core;
 	requires com.google.gson;
 	requires Fuzzer;
+	requires org.objectweb.asm;
 	
 	opens com.lapissea.dfs.run;
 	opens com.lapissea.dfs.run.sparseimage;

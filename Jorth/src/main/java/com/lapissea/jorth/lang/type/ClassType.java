@@ -1,15 +1,16 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.lang.Keyword;
 
 public enum ClassType{
-	CLASS, INTERFACE, ENUM, ANNOTATION;
+	CLASS(true, false),
+	INTERFACE(false, false),
+	ENUM(true, true),
+	ANNOTATION(false, false);
 	
+	public final boolean canBeFinal, mustBeFinal;
 	
-	public static ClassType from(Keyword keyword){
-		if(keyword == Keyword.INTERFACE) return INTERFACE;
-		if(keyword == Keyword.CLASS) return CLASS;
-		if(keyword == Keyword.ENUM) return ENUM;
-		throw new IllegalArgumentException();
+	ClassType(boolean canBeFinal, boolean mustBeFinal){
+		this.canBeFinal = canBeFinal;
+		this.mustBeFinal = mustBeFinal;
 	}
 }

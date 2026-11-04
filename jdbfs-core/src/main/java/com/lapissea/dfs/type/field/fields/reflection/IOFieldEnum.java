@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitReader;
 import com.lapissea.dfs.io.bit.BitWriter;
 import com.lapissea.dfs.io.bit.EnumUniverse;
@@ -10,9 +11,12 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,8 +24,9 @@ import java.util.Objects;
 import java.util.Set;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
+import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
+public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E> implements SpecializedGenerator.OnBitSpace<T>{
 	
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage extends FieldUsage.InstanceOf<Enum>{
@@ -48,7 +53,12 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 		if(getNullability() == DEFAULT_IF_NULL && enumUniverse.isEmpty()){
 			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for empty enums");
 		}
-		defaultValue = enumUniverse.getFirst();
+		
+		if(enumUniverse.isEmpty() && getNullability() != NULLABLE){
+			throw new MalformedStruct("It is not possible to have non null enums with 0 values");
+		}
+		
+		defaultValue = enumUniverse.isEmpty()? null : enumUniverse.getFirst();
 	}
 	@Override
 	protected Set<TypeFlag> computeTypeFlags(){
@@ -89,5 +99,37 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	@Override
 	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 		return get(ioPool1, inst1) == get(ioPool2, inst2);
+	}
+	
+	@Override
+	public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, UnsupportedCodeGenType{
+		accessMap.set(getAccessor(), body, code -> {
+			if(nullable()){
+				code.get(bitsFieldName).val(0).equalityOp().ifTrue(c -> c.nullVal(enumUniverse.type))
+				    .elseRun(c -> {
+					    accessMap.getEnumArray(enumUniverse.type, c);
+					    c.get(bitsFieldName).add(-1).getArrayElement();
+				    });
+				return;
+			}
+			accessMap.getEnumArray(enumUniverse.type, code);
+			code.get(bitsFieldName)
+			    .getArrayElement();
+		});
+	}
+
+	@Override
+	public void injectWriteFieldToBits(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.markTemporary();
+		var value = accessMap.temporaryLocalField(enumUniverse.type, "writeEnum", body);
+		accessMap.getFieldRef(this, body);
+		body.call("get", args -> { args.get("ioPool"); accessMap.getObject(args); }).cast(enumUniverse.type).set(value);
+		if(nullable()){
+			body.get(value).ifIsNull(b -> b.val(0L))
+			    .elseRun(b -> b.get(value).call("ordinal").add(1).cast(long.class));
+		}else{
+			body.get(value).call("ordinal").cast(long.class);
+		}
+		accessMap.dropTemporary(body);
 	}
 }

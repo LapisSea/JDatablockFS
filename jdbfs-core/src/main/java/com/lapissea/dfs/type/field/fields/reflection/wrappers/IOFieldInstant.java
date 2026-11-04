@@ -20,6 +20,8 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
@@ -47,7 +49,7 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends IOField
 	private static MethodHandle CONSTR;
 	
 	@IOInstance.Order({"seconds", "nanos"})
-	private interface IOInstant extends IOInstance.Def<IOInstant>{
+	public interface IOInstant extends IOInstance.Def<IOInstant>{
 		
 		static String toString(IOInstant val){
 			return val.getData().toString();
@@ -131,5 +133,11 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends IOField
 	@Override
 	protected void skipValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		instancePipe.skip(provider, src, genericContext);
+	}
+	
+	@Override
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.readStruct(instancePipe, body, a -> a.nullVal(GenericContext.class));
+		body.call("getData");
 	}
 }

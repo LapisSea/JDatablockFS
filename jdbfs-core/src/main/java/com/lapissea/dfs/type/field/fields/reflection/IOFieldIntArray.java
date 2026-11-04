@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.NumberSize;
@@ -13,11 +14,14 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.List;
@@ -25,7 +29,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
-public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, int[]>{
+public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, int[]> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<int[]>{
@@ -137,10 +141,7 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 		else{
 			int size = getArrSize(ioPool, instance);
 			var nSiz = getNumSize(ioPool, instance);
-			data = new int[size];
-			for(int i = 0; i<data.length; i++){
-				data[i] = nSiz.readIntSigned(src);
-			}
+			data = nSiz.readIntsSigned(src, size);
 		}
 		set(ioPool, instance, data);
 	}
@@ -151,5 +152,47 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 		if(size == 0) return;
 		var nSiz = getNumSize(ioPool, instance);
 		src.skipExact(size*(long)nSiz.bytes);
+	}
+	
+	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		injectWriteFieldNullable(body, accessMap, null, writer -> {
+			var array = accessMap.temporaryLocalField(int[].class, "intArray", writer);
+			writer.set(array);
+			var width = accessMap.temporaryLocalField(NumberSize.class, "intWidth", writer);
+			accessMap.get(numSize, writer);
+			writer.set(width);
+			var index = accessMap.temporaryLocalField(int.class, "intIndex", writer);
+			writer.set(index, 0);
+			writer.loop(check -> {
+				check.get(index);
+				accessMap.get(arraySize, check);
+				check.lessThanOp();
+			}, loop -> {
+				loop.get(width).call("writeIntSigned", args -> args.get("dest").get(array).get(index).getArrayElement());
+				loop.inc(index);
+			});
+		});
+	}
+
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(arraySize, args);
+			args.cast(long.class);
+			accessMap.get(numSize, args);
+			args.get(NumberSize.class, "bytes").cast(long.class).mul();
+		});
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			accessMap.get(numSize, bod);
+			bod.call("readIntsSigned", args -> {
+				args.get("src");
+				accessMap.get(arraySize, args);
+			});
+		});
 	}
 }

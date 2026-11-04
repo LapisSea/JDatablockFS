@@ -9,9 +9,13 @@ import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.iterableplus.IterableIntPP;
 import com.lapissea.iterableplus.IterableLongPP;
 import com.lapissea.iterableplus.OptionalPP;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.List;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
@@ -184,6 +188,27 @@ public enum NumberSize{
 		}
 	}
 	
+	
+	public void readFloatConst(CodeBlock target) throws MalformedJorth{
+		readFloatConst(target, e -> e.get("src"));
+	}
+	public void readFloatConst(CodeBlock target, CodeArg getContentReader) throws MalformedJorth{
+		switch(this){
+			case VOID -> target.val(0F);
+			case SHORT, INT -> {
+				getContentReader.accept(target);
+				target.call("readFloat" + bytes);
+			}
+			case BIG_INT, SMALL_LONG, LONG -> throw new MalformedJorth("Attempted to read too large of a number");
+		}
+	}
+	public static void readFloatDyn(CodeBlock body) throws MalformedJorth{
+		readFloatDyn(body, e -> e.get("src"));
+	}
+	public static void readFloatDyn(CodeBlock body, CodeArg getContentReader) throws MalformedJorth{
+		body.call("readFloat", getContentReader);
+	}
+	
 	public long read(ContentReader in) throws IOException{
 		return switch(this){
 			case VOID -> 0;
@@ -197,6 +222,22 @@ public enum NumberSize{
 		};
 	}
 	
+	public void readConst(CodeBlock target, boolean signed) throws MalformedJorth{
+		readConst(target, e -> e.get("src"), signed);
+	}
+	public void readConst(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		if(this == VOID){
+			target.val(0L);
+			return;
+		}
+		getContentReader.accept(target);
+		target.call("readWord", List.of(bytes));
+		if(signed && this != LONG){
+			int shift = Long.SIZE - bytes*Byte.SIZE;
+			target.bitShiftLeft(shift).bitShiftRight(false, shift);
+		}
+	}
+
 	public int readInt(ContentReader in) throws IOException{
 		return switch(this){
 			case VOID -> 0;
@@ -208,6 +249,37 @@ public enum NumberSize{
 		};
 	}
 	
+	public void readIntConst(CodeBlock target, boolean signed) throws MalformedJorth{
+		readIntConst(target, e -> e.get("src"), signed);
+	}
+	public void readIntConst(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		if(bytes>Integer.BYTES) throw new MalformedJorth("Attempted to read too large of a number");
+		if(this == VOID){
+			target.val(0);
+			return;
+		}
+		getContentReader.accept(target);
+		target.call("readWord", List.of(bytes)).cast(int.class);
+		if(signed && this != INT){
+			int shift = Integer.SIZE - bytes*Byte.SIZE;
+			target.bitShiftLeft(shift).bitShiftRight(false, shift);
+		}
+	}
+
+	public static void readIntDyn(CodeBlock target, boolean signed) throws MalformedJorth{
+		readIntDyn(target, e -> e.get("src"), signed);
+	}
+	public static void readIntDyn(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		target.call(signed? "readIntSigned" : "readInt", getContentReader);
+	}
+	
+	public static void readDyn(CodeBlock target, boolean signed) throws MalformedJorth{
+		readDyn(target, e -> e.get("src"), signed);
+	}
+	public static void readDyn(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		target.call(signed? "readSigned" : "read", getContentReader);
+	}
+	
 	public void skip(ContentReader in) throws IOException{
 		in.skipExact(bytes);
 	}
@@ -217,6 +289,14 @@ public enum NumberSize{
 		return toSigned(read(in));
 	}
 	
+	public int[] readIntsSigned(ContentReader in, int count) throws IOException{
+		var res = new int[count];
+		if(this == VOID) return res;
+		for(int i = 0; i<res.length; i++){
+			res[i] = toSigned(readInt(in));
+		}
+		return res;
+	}
 	public int readIntSigned(ContentReader in) throws IOException{
 		if(this == VOID) return 0;
 		return toSigned(readInt(in));

@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.NumberSize;
@@ -14,12 +15,15 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
@@ -32,7 +36,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
-public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> extends NullFlagCompanyField<T, CollectionType>{
+public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> extends NullFlagCompanyField<T, CollectionType> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageList implements FieldUsage{
@@ -233,5 +237,70 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 		if(size == 0) return;
 		var nSiz = getNumSize(ioPool, instance);
 		src.skipExact(size*(long)nSiz.bytes);
+	}
+
+	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		injectWriteFieldNullable(body, accessMap, null, writer -> {
+			var value = accessMap.temporaryLocalField(getType(), "integers", writer);
+			writer.set(value);
+			var width = accessMap.temporaryLocalField(NumberSize.class, "integerWidth", writer);
+			accessMap.get(numSize, writer);
+			writer.set(width);
+			var index = accessMap.temporaryLocalField(int.class, "integerIndex", writer);
+			writer.set(index, 0);
+			writer.loop(check -> {
+				check.get(index);
+				accessMap.get(collectionSize, check);
+				check.lessThanOp();
+			}, loop -> {
+				loop.get(width).call("writeIntSigned", args -> {
+					args.get("dest").get(value);
+					if(getType().isArray()) args.get(index).getArrayElement();
+					else args.call("get", i -> i.get(index)).cast(Integer.class);
+					args.call("intValue");
+				});
+				loop.inc(index);
+			});
+		});
+	}
+
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(collectionSize, args);
+			args.cast(long.class);
+			accessMap.get(numSize, args);
+			args.get(NumberSize.class, "bytes").cast(long.class).mul();
+		});
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			accessMap.markTemporary();
+			var size = accessMap.temporaryLocalField(int.class, "collectionSize", bod);
+			accessMap.get(collectionSize, bod);
+			bod.set(size);
+			var width = accessMap.temporaryLocalField(NumberSize.class, "numberSize", bod);
+			accessMap.get(numSize, bod);
+			bod.set(width);
+			boolean array = getType().isArray();
+			var result = accessMap.temporaryLocalField(array? Integer[].class : ArrayList.class, "integers", bod);
+			bod.newObj(array? Integer[].class : ArrayList.class, args -> args.get(size)).set(result);
+			var index = accessMap.temporaryLocalField(int.class, "index", bod);
+			bod.set(index, 0);
+			bod.loop(check -> check.get(index).get(size).lessThanOp(), loop -> {
+				loop.get(result);
+				if(array){
+					loop.get(index).get(width).call("readIntSigned", args -> args.get("src")).box().setArrayElement();
+				}else{
+					loop.call("add", args -> args.get(width).call("readIntSigned", a -> a.get("src")).box()).pop();
+				}
+				loop.inc(index);
+			});
+			bod.get(result).cast(getType());
+			accessMap.dropTemporary(bod);
+		});
 	}
 }

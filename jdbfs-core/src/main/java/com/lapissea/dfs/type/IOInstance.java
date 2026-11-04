@@ -361,7 +361,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var s = thisStruct;
 			if(s == null){
 				s = fetchStruct(false);
-				if(s.getEstimatedState() == StagedInit.STATE_DONE){
+				if(s.getInitializationState() == StagedInit.STATE_DONE){
 					s = getThisStruct();
 				}
 			}
@@ -396,7 +396,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public SELF clone(){
 			var struct = getThisStruct();
 			if(struct.needsBuilderObj()){
-				return immutableDeepClone(struct);
+				return struct.immutableDeepClone(self());
 			}
 			
 			SELF copy;
@@ -409,54 +409,14 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return copy;
 		}
 		
-		private SELF immutableDeepClone(Struct<SELF> struct){
-			var builderTyp = struct.getBuilderObjType(false);
-			
-			var builder = builderTyp.make();
-			builder.copyFrom(self());
-			builder = builder.clone();//deep clone fields
-			
-			return builder.build();
-		}
-		
 		@SuppressWarnings("unchecked")
 		private void deepClone(SELF copy){
 			var fields = getThisStruct().getCloneFields();
 			if(fields.isEmpty()) return;
 			
 			for(IOField<SELF, ?> field : fields){
-				var acc = field.getAccessor();
-				var typ = acc.getType();
-				if(typ.isArray()){
-					var arrField = (IOField<SELF, Object[]>)field;
-					
-					var arr = arrField.get(null, (SELF)this);
-					if(arr == null || arr.length == 0) continue;
-					
-					arr = arr.clone();
-					
-					if(isInstance(typ.componentType())){
-						var iArr = (IOInstance<?>[])arr;
-						for(int i = 0; i<iArr.length; i++){
-							var el = iArr[i];
-							iArr[i] = el.clone();
-						}
-					}
-					
-					arrField.set(null, copy, arr);
-					continue;
-				}
-				
-				if(!isInstance(typ)) continue;
-				if(isUnmanaged(typ)) continue;
-				var instField = (IOField<SELF, IOInstance<?>>)field;
-				
-				var val = instField.get(null, (SELF)this);
-				if(val == null) continue;
-				
-				val = val.clone();
-				
-				instField.set(null, copy, val);
+				var copied = Struct.makeCopyValue(self(), field);
+				((IOField<SELF, Object>)field).set(null, copy, copied);
 			}
 		}
 	}
@@ -685,7 +645,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				struct = Struct.of((Class<VT>)unmanagedField.getType());
 			}
 			
-			return StructPipe.of(pipe.getClass(), struct);
+			return StructPipe.of(pipe, struct);
 		}
 		
 		protected final void writeManagedFields() throws IOException{

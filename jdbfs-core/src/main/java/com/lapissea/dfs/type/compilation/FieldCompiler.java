@@ -19,6 +19,7 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.StoragePool;
+import com.lapissea.dfs.type.field.VirtualAccessor;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.FunctionalReflectionAccessor;
@@ -26,7 +27,6 @@ import com.lapissea.dfs.type.field.access.FunctionalVarHandleAccessor;
 import com.lapissea.dfs.type.field.access.ReflectionAccessor;
 import com.lapissea.dfs.type.field.access.UnsafeAccessor;
 import com.lapissea.dfs.type.field.access.VarHandleAccessor;
-import com.lapissea.dfs.type.field.access.VirtualAccessor;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -231,7 +231,8 @@ public final class FieldCompiler{
 					
 					VirtualAccessor.TypeOff typeOff;
 					
-					var primitive = SupportedPrimitive.get(s.type);
+					// Boxed virtual values need object storage so they can retain null.
+					var primitive = SupportedPrimitive.getStrict(s.type);
 					
 					if(primitive.isEmpty()){
 						var index = accessIndex.compute(s.storagePool, (k, v) -> v == null? 0 : v + 1);
@@ -385,7 +386,17 @@ public final class FieldCompiler{
 				
 				fields.add(switch(FIELD_ACCESS){
 					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
-					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
+					case VAR_HANDLE -> {
+						try{
+							yield VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
+						}catch(IllegalAccessException e){
+							Log.warn(
+								"Failed to create optimized field accessor for {}#yellow -> {}#red.\n  Reason: {}\n  Attempting to use reflection...",
+								struct.getType(), fieldName, e
+							);
+							yield ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
+						}
+					}
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
@@ -492,4 +503,5 @@ public final class FieldCompiler{
 	public static SequencedSet<Class<?>> getWrapperTypes(){
 		return FieldRegistry.getWrappers();
 	}
+	
 }

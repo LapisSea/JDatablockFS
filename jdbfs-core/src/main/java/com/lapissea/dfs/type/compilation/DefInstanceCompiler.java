@@ -24,9 +24,12 @@ import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
 import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.jorth.BytecodeUtils;
-import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -44,19 +47,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
-import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.StringJoiner;
-import java.util.WeakHashMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -66,42 +57,6 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NOT_NUL
 import static com.lapissea.util.ConsoleColors.*;
 
 public final class DefInstanceCompiler{
-	
-	
-	//////////////////////////////// INIT /////////////////////////////////
-	
-	static{
-		if(!Boolean.getBoolean("jorth.noPreload")){
-			Thread.startVirtualThread(() -> {
-				try{
-					Jorth.generateClass(null, "A", writer -> {
-						writer.codePart().close();
-						writer.write(
-							"""
-								class A start
-								
-									field a #String
-								
-									function a
-										arg a int
-										returns int
-									start
-										get #arg a
-									end
-								end
-								"""
-						);
-					});
-				}catch(MalformedJorth e){
-					e.printStackTrace();
-				}
-			});
-		}
-	}
-	
-	
-	/// ///////////////////////////// DATA /////////////////////////////////
-	
 	
 	private record Specials(
 		Match<Method> set,
@@ -206,53 +161,34 @@ public final class DefInstanceCompiler{
 			
 			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 			
-			var log   = JorthLogger.make();
-			var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
+			var cw = new ClassDefinition(interf.getClassLoader());
+			
 			try{
 				
-				try(var writer = jorth.writer()){
-					writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
-					writer.addImportAs(completionName, "typ.impl");
-					
-					var parms = interf.getTypeParameters();
-					for(var parm : parms){
-						var bounds = parm.getBounds();
-						if(bounds.length != 1){
-							throw new NotImplementedException("Implement multi bound type variable");
-						}
-						writer.write("type-arg {!} {}", parm.getName(), bounds[0]);
+				writeAnnotations(cw, Arrays.asList(interf.getAnnotations()));
+				cw.typeDef("typ.impl", ClassName.dotted(completionName));
+				
+				var parms = interf.getTypeParameters();
+				for(var parm : parms){
+					var bounds = parm.getBounds();
+					if(bounds.length != 1){
+						throw new NotImplementedException("Implement multi bound type variable");
 					}
-					
-					String parmsStr;
-					if(parms.length == 0) parmsStr = "";
-					else parmsStr = Iters.from(parms).joinAsStr(" ", "<", ">", TypeVariable::getName);
-					
-					writer.write("implements {!}{}", interf.getName(), parmsStr);
-					writer.write("interface #typ.impl start");
-					
-					unmappedClassFn(writer, interf);
-					
-					for(String name : missingGetters){
-						writer.write(
-							"""
-								function {!0}
-									{1} returns
-								end
-								""",
-							style.mapGetter(name),
-							setterMap.get(name).type()
-						);
-					}
-					writer.wEnd();
+					cw.genericArg(parm);
 				}
 				
-				var file = jorth.getClassFile(completionName);
+				cw.implement(GenericType.of(interf).withArgs(parms));
+				cw.type(ClassType.INTERFACE).name(ClassName.dotted(completionName));
+				
+				unmappedClassFn(cw, interf);
+				
+				for(String name : missingGetters){
+					cw.function(style.mapGetter(name)).returns(setterMap.get(name).type());
+				}
+				
+				var file = cw.getClassFile();
 				
 				ClassGenerationCommons.dumpClassName(completionName, file);
-				if(log != null){
-					Log.log("Generated jorth:\n" + log.output());
-					BytecodeUtils.printClass(file);
-				}
 				
 				Class<T> completed;
 				try{
@@ -570,123 +506,109 @@ public final class DefInstanceCompiler{
 		               IOInstance.Def.IMPL_NAME_POSTFIX + (numAddon != 0? "~" + numAddon : "") +
 		               includeNames.map(n -> Iters.from(n).joinAsStr("_", IOInstance.Def.IMPL_FIELDS_MARK, "")).orElse("");
 		
-		var log = JorthLogger.make();
 		try{
-			var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
+			var cw = new ClassDefinition(interf.getClassLoader());
 			
-			jorth.addImportAs(implName, "typ.impl");
-			jorth.addImportAs(interf.getName(), "typ.interf");
-			jorth.addImports(
-				Struct.class, Objects.class, IOValue.class,
-				ChunkPointer.class, IOInstance.Managed.class,
-				UnsupportedOperationException.class
-			);
+			var typImpl = ClassName.dotted(implName);
+			cw.typeDef("typ.impl", typImpl);
+			cw.typeDef("typ.interf", interf);
 			
-			try(var writer = jorth.writer()){
-				
-				
-				var parms    = interf.getTypeParameters();
-				var parmsStr = "";
-				if(parms.length>0) parmsStr = Iters.from(parms).joinAsStr(" ", "<", ">", TypeVariable::getName);
-				
-				for(var parm : parms){
-					var bounds = parm.getBounds();
-					if(bounds.length != 1){
-						throw new NotImplementedException("Implement multi bound type variable");
-					}
-					writer.write("type-arg {!} {}", parm.getName(), bounds[0]);
+			
+			
+			var parms    = interf.getTypeParameters();
+			var parmsStr = "";
+			if(parms.length>0) parmsStr = Iters.from(parms).joinAsStr(" ", "<", ">", TypeVariable::getName);
+			
+			for(var parm : parms){
+				var bounds = parm.getBounds();
+				if(bounds.length != 1){
+					throw new NotImplementedException("Implement multi bound type variable");
 				}
-				
-				writer.write("implements #typ.interf" + parmsStr);
-				
-				writer.write(
-					"""
-						extends #IOInstance.Managed <#typ.impl{}>
-						public class #typ.impl start
-						""", parmsStr);
-				
-				defineStatics(writer, completion.base);
-				
-				for(var info : fieldInfo){
-					if(isFieldIncluded(includeNames, info.name)){
-						defineField(writer, info);
-						implementUserAccess(writer, info, humanName);
-					}else{
-						defineNoField(writer, info);
-					}
-				}
-				
-				
-				var includedFields  = includeNames.map(include -> Iters.from(fieldInfo).filter(f -> include.contains(f.name)).toList()).orElse(fieldInfo);
-				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> Iters.from(o).filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
-				
-				if(Iters.from(fieldInfo).allMatch(
-					f -> f.setter.isPresent() ||
-					     IOFieldTools.isNullable(f) ||
-					     List.of(ChunkPointer.class, Optional.class).contains(Utils.typeToRaw(f.type))
-				)){
-					generateDefaultConstructor(writer, includedFields);
-				}
-				
-				generateDataConstructor(writer, orderedFields, includeNames, humanName);//All fields constructor
-				if(includeNames.isPresent()){
-					generateDataConstructor(writer, includedOrdered, includeNames, humanName);//Included only fields constructor
-				}
-				
-				readOnlyConstructor:
-				if(specials.set.isEmpty() && completion.completed != completion.base){
-					var setters = new ArrayList<FieldStub>();
-					collectMethods(completion.base, new ArrayList<>(), setters);
-					var setterNames = Iters.from(setters).toModSet(FieldStub::varName);
-					
-					var dataFields = Iters.from(includedFields).filter(
-						f -> !setterNames.contains(f.name) && isFieldIncluded(includeNames, f.name)
-					).toList();
-					if(dataFields.isEmpty()) break readOnlyConstructor;
-					if(orderedFields.isEmpty() && dataFields.size()>1) break readOnlyConstructor;
-					
-					var dfSet = Set.copyOf(dataFields);
-					
-					for(Match<List<FieldInfo>> op : List.of(orderedFields, includedOrdered)){
-						if(!(op instanceof Some(var fields))) continue;
-						if(dfSet.equals(Set.copyOf(fields))){
-							break readOnlyConstructor;
-						}
-					}
-					
-					generateDataConstructor(writer, Match.of(dataFields), Match.empty(), humanName);
-				}
-				
-				if(specials.set instanceof Some(var setFn)){
-					
-					for(FieldInfo info : orderedFields.orElseThrow()){
-						writer.write(
-							"arg {!} {}",
-							info.name,
-							info.type);
-					}
-					
-					writer.write("public function {} start", setFn.getName());
-					
-					for(FieldInfo info : includedOrdered.orElseThrow()){
-						writer.write("get #arg {!}", info.name);
-						if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
-							JorthUtils.nullCheckDup(writer, fieldNullMsg(info, humanName));
-						}
-						writer.write("set this {!}", info.name);
-					}
-					writer.wEnd();
-				}
-				
-				generateSpecialToString(interf, writer, specials);
-				
-				writer.wEnd();
+				cw.genericArg(parm);
 			}
 			
-			var file = jorth.getClassFile(implName);
+			cw.implement(GenericType.of(interf).withArgs(parms));
+			
+			cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(GenericType.of(typImpl).withArgs(parms)))
+			  .name(typImpl).finalAcc();
+			
+			defineStatics(cw, completion.base);
+			
+			for(var info : fieldInfo){
+				if(isFieldIncluded(includeNames, info.name)){
+					defineField(cw, info);
+					implementUserAccess(cw, info, humanName);
+				}else{
+					defineNoField(cw, info);
+				}
+			}
+			
+			
+			var includedFields  = includeNames.map(include -> Iters.from(fieldInfo).filter(f -> include.contains(f.name)).toList()).orElse(fieldInfo);
+			var includedOrdered = includeNames.map(include -> orderedFields.map(o -> Iters.from(o).filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
+			
+			if(Iters.from(fieldInfo).allMatch(
+				f -> f.setter.isPresent() ||
+				     IOFieldTools.isNullable(f) ||
+				     List.of(ChunkPointer.class, Optional.class).contains(Utils.typeToRaw(f.type))
+			)){
+				generateDefaultConstructor(cw, includedFields);
+			}
+			
+			generateDataConstructor(cw, orderedFields, includeNames, humanName);//All fields constructor
+			if(includeNames.isPresent()){
+				generateDataConstructor(cw, includedOrdered, includeNames, humanName);//Included only fields constructor
+			}
+			
+			readOnlyConstructor:
+			if(specials.set.isEmpty() && completion.completed != completion.base){
+				var setters = new ArrayList<FieldStub>();
+				collectMethods(completion.base, new ArrayList<>(), setters);
+				var setterNames = Iters.from(setters).toModSet(FieldStub::varName);
+				
+				var dataFields = Iters.from(includedFields).filter(
+					f -> !setterNames.contains(f.name) && isFieldIncluded(includeNames, f.name)
+				).toList();
+				if(dataFields.isEmpty()) break readOnlyConstructor;
+				if(orderedFields.isEmpty() && dataFields.size()>1) break readOnlyConstructor;
+				
+				var dfSet = Set.copyOf(dataFields);
+				
+				for(Match<List<FieldInfo>> op : List.of(orderedFields, includedOrdered)){
+					if(!(op instanceof Some(var fields))) continue;
+					if(dfSet.equals(Set.copyOf(fields))){
+						break readOnlyConstructor;
+					}
+				}
+				
+				generateDataConstructor(cw, Match.of(dataFields), Match.empty(), humanName);
+			}
+			
+			if(specials.set instanceof Some(var setFn)){
+				
+				var set = cw.function(setFn.getName());
+				
+				for(FieldInfo info : orderedFields.orElseThrow()){
+					set.arg(info.type, info.name);
+				}
+				
+				var body = set.body();
+				
+				for(FieldInfo info : includedOrdered.orElseThrow()){
+					body.get(info.name);
+					if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
+						JorthUtils.nullCheckDup(body, fieldNullMsg(info, humanName));
+					}
+					body.setThis(info.name);
+				}
+			}
+			
+			generateSpecialToString(interf, cw, specials);
+			
+			
+			var file = cw.getClassFile();
 			ClassGenerationCommons.dumpClassName(implName, file);
-			if(log != null){
-				Log.log(log.output());
+			if(ConfigDefs.CLASSGEN_PRINT_BYTECODE.resolveVal()){
 				BytecodeUtils.printClass(file);
 			}
 			
@@ -701,17 +623,9 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static void unmappedClassFn(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
-		writer.write(
-			"""
-				public static function {}
-					returns #Class
-				start
-					class {}
-				end
-				""",
-			GET_UNMAPPED_CLASS_FN, baseClazz
-		);
+	private static void unmappedClassFn(ClassDefinition cw, Class<?> baseClazz) throws MalformedJorth{
+		cw.function(GET_UNMAPPED_CLASS_FN).returns(Class.class).staticAcc()
+		  .body().val(baseClazz);
 	}
 	
 	private static boolean isFieldIncluded(Match<Set<String>> includeNames, String name){
@@ -721,74 +635,56 @@ public final class DefInstanceCompiler{
 		};
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Specials specials) throws MalformedJorth{
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, ClassDefinition cw, Specials specials) throws MalformedJorth{
 		if(specials.toStr instanceof Some(var toStr)){
-			generateSpecialToString(interf, writer, toStr);
+			generateSpecialToString(interf, cw, toStr);
 		}
 		if(specials.toShortStr instanceof Some(var toShortStr)){
-			generateSpecialToString(interf, writer, toShortStr);
+			generateSpecialToString(interf, cw, toShortStr);
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Method method) throws MalformedJorth{
-		writer.write(
-			"""
-				public function {!0}
-					returns #String
-				start
-					static call {!1} {!0} start
-						get this this
-					end
-				end
-				""",
-			method.getName(),
-			interf.getName());
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, ClassDefinition cw, Method method) throws MalformedJorth{
+		
+		cw.function(method.getName()).returns(String.class)
+		  .body()
+		  .call(interf, method.getName(), args -> args.get("this"));
 	}
 	
-	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorth{
-		writer.write(
-			"""
-				public function <init>
-				start
-					super start
-						static call #typ.impl $STRUCT
-					end
-				""");
+	private static void generateDefaultConstructor(ClassDefinition cw, List<FieldInfo> fieldInfo) throws MalformedJorth{
+		var init = cw.instanceInit()
+		             .body()
+		             .callSuper(e -> e.call(e.getTypeDef("typ.impl"), "$STRUCT"));
 		
 		for(FieldInfo info : fieldInfo){
 			if(info.type == ChunkPointer.class){
-				writer.write("get #ChunkPointer NULL");
-				writer.write("set this {!}", info.name);
+				init.get(ChunkPointer.class, "NULL")
+				    .setThis(info.name);
 			}else if(Utils.typeToRaw(info.type) == Optional.class){
-				writer.write("static call {} empty", Optional.class);
-				writer.write("set this {!}", info.name);
+				init.call(Optional.class, "empty")
+				    .setThis(info.name);
 			}
 		}
-		writer.wEnd();
 	}
 	
-	private static void generateDataConstructor(CodeStream writer, Match<List<FieldInfo>> oOrderedFields, Match<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
+	private static void generateDataConstructor(ClassDefinition cw, Match<List<FieldInfo>> oOrderedFields, Match<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
 		if(!(oOrderedFields instanceof Some(var orderedFields)) || orderedFields.isEmpty()){
 			return;
 		}
 		
-		writer.write(
-			"""
-				public function <init>
-					template-for #e in {0} start
-						arg #e.key #e.value
-					end
-				start
-					super start
-						static call #typ.impl $STRUCT
-					end
-				""",
-			Iters.rangeMap(0, orderedFields.size(), i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type))
-		);
+		var init = cw.instanceInit();
+		for(int i = 0; i<orderedFields.size(); i++){
+			init.arg(orderedFields.get(i).type, "arg" + i);
+		}
+		var body = init.body()
+		               .callSuper(args -> args.call(cw.getTypeDef("typ.impl"), "$STRUCT"));
+		
+		
 		
 		for(int i = 0; i<orderedFields.size(); i++){
 			FieldInfo info     = orderedFields.get(i);
 			boolean   included = isFieldIncluded(includeNames, info.name);
+			var       argName  = "arg" + i;
 			
 			boolean nullCheck;
 			if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
@@ -800,18 +696,17 @@ public final class DefInstanceCompiler{
 			
 			if(!included){
 				if(nullCheck){
-					JorthUtils.nullCheck(writer, "get #arg arg" + i, fieldNullMsg(info, baseClassSimpleName));
+					JorthUtils.nullCheck(body, e -> e.get(argName), fieldNullMsg(info, baseClassSimpleName));
 				}
 				continue;
 			}
 			
-			writer.write("get #arg arg" + i);
+			body.get(argName);
 			if(nullCheck){
-				JorthUtils.nullCheckDup(writer, fieldNullMsg(info, baseClassSimpleName));
+				JorthUtils.nullCheckDup(body, fieldNullMsg(info, baseClassSimpleName));
 			}
-			writer.write("set this {!}", info.name);
+			body.setThis(info.name);
 		}
-		writer.wEnd();
 	}
 	
 	private static Set<String> collectNames(Class<?> its){
@@ -863,33 +758,22 @@ public final class DefInstanceCompiler{
 		return Match.of(ordered);
 	}
 	
-	private static void defineStatics(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
-		writer.write(
-			"""
-				private static field $V_STRUCT #Struct
-				
-				private static function $STRUCT
-					returns #Struct
-				start
-					static call {} isNull start
-						get #typ.impl $V_STRUCT
-					end
-					if start
-						static call #Struct of start
-							class #typ.impl
-						end
-						set #typ.impl $V_STRUCT
-					end
-					get #typ.impl $V_STRUCT
-				end
-				
-				""",
-			Objects.class);
+	private static void defineStatics(ClassDefinition cw, Class<?> baseClazz) throws MalformedJorth{
+		var vStruct = cw.field(Struct.class, "$V_STRUCT").staticAcc().visibility(Visibility.PRIVATE);
 		
-		unmappedClassFn(writer, baseClazz);
+		cw.function("$STRUCT").returns(Struct.class).staticAcc().visibility(Visibility.PRIVATE)
+		  .body()
+		  .call(Objects.class, "isNull", args -> args.get(vStruct))
+		  .ifTrue(b -> {
+			  b.call(Struct.class, "of", args -> args.val(args.getTypeDef("typ.impl")))
+			   .setField(vStruct);
+		  })
+		  .get(vStruct);
+		
+		unmappedClassFn(cw, baseClazz);
 	}
 	
-	private static void implementUserAccess(CodeStream writer, FieldInfo info, String classHumanName) throws MalformedJorth{
+	private static void implementUserAccess(ClassDefinition cw, FieldInfo info, String classHumanName) throws MalformedJorth{
 		
 		var getterName = info.getter.map(s -> s.method().getName()).orElseGet(() -> {
 			var setter = info.setter.orElseThrow();
@@ -899,47 +783,27 @@ public final class DefInstanceCompiler{
 			};
 		});
 		var setterName = info.setter.map(s -> s.method().getName());
-		writer.write(
-			"""
-				@ #IOValue start name '{!2}' end
-				@ #Override
-				public function {!0}
-					returns {1}
-				start
-					get this {!2}
-				end
-				""",
-			getterName,
-			info.type,
-			info.name
-		);
+		
+		cw.function(getterName).returns(info.type)
+		  .annotation(IOValue.class, Map.of("name", info.name))
+		  .annotation(Override.class)
+		  .body()
+		  .getThis(info.name);
 		
 		if(setterName.isPresent()){
-			writer.write(
-				"""
-					@ #IOValue start name '{!2}' end
-					@ #Override
-					public function {!0}
-						arg arg1 {1}
-					start
-						get #arg arg1
-					""",
-				setterName.get(),
-				info.type,
-				info.name
-			);
+			var body = cw.function(setterName.get())
+			             .arg(info.type, "val")
+			             .annotation(IOValue.class, Map.of("name", info.name))
+			             .annotation(Override.class)
+			             .body()
+			             .get("val");
 			
 			if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
-				JorthUtils.nullCheckDup(writer, fieldNullMsg(info, classHumanName));
+				JorthUtils.nullCheckDup(body, fieldNullMsg(info, classHumanName));
 			}
 			
-			writer.write(
-				"""
-						set this {!}
-					end
-					""",
-				info.name
-			);
+			body.setThis(info.name);
+			
 		}
 	}
 	
@@ -947,7 +811,7 @@ public final class DefInstanceCompiler{
 		return '"' + classHumanName + "." + info.name + "\" can not be null!";
 	}
 	
-	private static void defineNoField(CodeStream writer, FieldInfo info) throws MalformedJorth{
+	private static void defineNoField(ClassDefinition cw, FieldInfo info) throws MalformedJorth{
 		var getterName = info.getter.map(v -> v.method().getName()).orElseGet(() -> "get" + TextUtil.firstToUpperCase(info.name));
 		var setterName = info.setter.map(v -> v.method().getName()).orElseGet(() -> "set" + TextUtil.firstToUpperCase(info.name));
 		
@@ -958,43 +822,21 @@ public final class DefInstanceCompiler{
 		
 		if(Iters.from(anns).noneMatch(a -> a instanceof IOValue)) anns.add(valAnn);
 		
-		writeAnnotations(writer, anns);
-		writer.write(
-			"""
-				public function {!}
-					returns {}
-				start
-					new #UnsupportedOperationException
-					throw
-				end
-				""",
-			getterName,
-			info.type
-		);
+		var getter = cw.function(getterName).returns(info.type);
+		writeAnnotations(getter, anns);
+		getter.body()
+		      .throwNew(UnsupportedOperationException.class);
 		
-		writeAnnotations(writer, List.of(valAnn));
-		writer.write(
-			"""
-				public function {!}
-					arg arg0 {}
-				start
-					new #UnsupportedOperationException
-					throw
-				end
-				""",
-			setterName,
-			info.type
-		);
+		var setter = cw.function(setterName).arg(info.type, "arg0");
+		writeAnnotations(setter, List.of(valAnn));
+		setter.body()
+		      .throwNew(UnsupportedOperationException.class);
 	}
 	
-	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorth{
-		writeAnnotations(writer, info.annotations);
-		writer.write(
-			"private {} field {!} {}",
-			info.setter.isEmpty()? "final" : "",
-			info.name,
-			info.type
-		);
+	private static void defineField(ClassDefinition cw, FieldInfo info) throws MalformedJorth{
+		var f = cw.field(info.type, info.name).visibility(Visibility.PRIVATE);
+		if(info.setter.isEmpty()) f.finalAcc();
+		writeAnnotations(f, info.annotations);
 	}
 	
 	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, Collection<FieldStub> getters, Collection<FieldStub> setters){

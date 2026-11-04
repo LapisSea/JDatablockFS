@@ -7,13 +7,15 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
-import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
+import java.util.Map;
 
 import static com.lapissea.dfs.run.TestUtils.distributedRandomBatch;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,18 +84,13 @@ public class CompressionTests{
 	private static <T extends IOInstance<T>> FuzzingRunner<?, ?, ?> createTypeIntegrityRunner(IOCompression.Type type) throws MalformedJorth{
 		
 		var name = CompressionTests.class.getPackageName() + ".Holder$" + type;
-		var bytecode = Jorth.generateClass(null, name, code -> {
-			code.addImports(IOCompression.class, IOValue.class, IOInstance.Managed.class);
-			code.write(
-				"""
-					extends #IOInstance.Managed
-					public class {} start
-						@ #IOCompression start value {!} end
-						@ #IOValue
-						public field data byte array
-					end
-					""", name, type);
-		});
+		var cw   = new ClassDefinition(null).finalAcc();
+		cw.extendsType(IOInstance.Managed.class)
+		  .name(ClassName.dotted(name));
+		cw.field(byte[].class, "data")
+		  .annotation(IOCompression.class, Map.of("value", type))
+		  .annotation(IOValue.class);
+		var bytecode = cw.getClassFile();
 		
 		//noinspection unchecked
 		var clazz = (Class<T>)compressionHolder(name, bytecode);

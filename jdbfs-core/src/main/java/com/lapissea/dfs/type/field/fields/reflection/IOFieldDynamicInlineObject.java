@@ -3,6 +3,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
@@ -21,11 +22,15 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -36,7 +41,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
-public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{
@@ -178,4 +183,20 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		IOType typ = getType(ioPool, provider, instance);
 		DynamicSupport.skipTyp(typ, provider, src, makeContext(genericContext));
 	}
+	
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		var type = Objects.requireNonNull(getType());
+		injectReadFieldNullable(body, accessMap, null, b -> {
+			b.call(CodeUtils.class, "dynamic_readTyp", b1 -> {
+				accessMap.getFieldRef(this, b1);
+				accessMap.get(typeID, b1);
+				b1.get("provider")
+				  .get("src")
+				  .get("genericContext");
+			});
+			if(type != Object.class) b.cast(type);
+		});
+	}
+	
 }

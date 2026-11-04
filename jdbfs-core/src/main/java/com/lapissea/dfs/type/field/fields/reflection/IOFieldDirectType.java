@@ -15,6 +15,7 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -22,6 +23,8 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -32,7 +35,7 @@ import java.util.Set;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
 @IOUnsafeValue.Mark
-public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCompanyField<T, Type>{
+public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCompanyField<T, Type> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{
@@ -129,4 +132,32 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{ }
+	
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		
+		if(nullable()){
+			accessMap.set(getAccessor(), body, e -> {
+				accessMap.get(id, body);
+				body.val(0).ifEquality(b -> b.nullVal(getType()))
+				    .elseRun(b -> {
+					    b.get("provider")
+					     .call("getTypeDb")
+					     .call("fromID", args -> accessMap.get(id, args))
+					     .call("generic", args -> args.get("provider").call("getTypeDb"))
+					     .cast(getType());
+				    });
+			});
+		}else{
+			accessMap.set(getAccessor(), body, b -> {
+				b.get("provider")
+				 .call("getTypeDb")
+				 .call("fromID", args -> accessMap.get(id, args))
+				 .call("generic", args -> args.get("provider").call("getTypeDb"))
+				 .cast(getType());
+			});
+		}
+		
+		
+	}
 }

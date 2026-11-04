@@ -38,21 +38,24 @@ public interface AccessProvider{
 		public MethodHandle unreflect(Constructor<?> constructor){ throw new UnsupportedOperationException(); }
 		
 		@Override
-		public <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface){
+		public <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface, boolean require){
 			throw NotImplementedException.infer();//TODO: implement UnoptimizedAccessProvider.makeLambda()
 		}
 		@Override
-		public <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface){
+		public <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface, boolean require){
 			return makeLambdaUnop(constructor, functionalInterface);
 		}
 		
 		@Override
-		public Class<?> defineClass(Class<?> target, byte[] bytecode){ throw new UnsupportedOperationException(); }
+		public Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden){ throw new UnsupportedOperationException(); }
 		@Override
-		public AccessProvider adapt(Class<?> target, Mode[] modes) throws IllegalAccessException{
+		public AccessProvider adapt(Class<?> target, boolean required, Mode[] modes) throws IllegalAccessException{
 			if(AccessUtils.isPublicMode(modes)) return this;
 			var lookup = MethodHandles.privateLookupIn(target, MethodHandles.publicLookup());
-			AccessUtils.requireModes(lookup, modes);
+			var err    = AccessUtils.requireModes(lookup, modes);
+			if(err.isPresent()){
+				throw new IllegalAccessException(err.get().get());
+			}
 			return new DirectLookup(lookup);
 		}
 		
@@ -89,7 +92,7 @@ public interface AccessProvider{
 		
 		public DirectLookup(MethodHandles.Lookup lookup){ this.lookup = Objects.requireNonNull(lookup); }
 		
-		private MethodHandles.Lookup getLookup(Class<?> clazz, boolean strip, Mode... modes) throws IllegalAccessException{
+		private MethodHandles.Lookup getLookup(Class<?> clazz, boolean strip, boolean require, Mode... modes) throws IllegalAccessException{
 			
 			// Public members do not need the lookup class to be the target, so a public lookup can be used
 			// directly. Forcing privateLookupIn here would break ordinary public access.
@@ -97,9 +100,15 @@ public interface AccessProvider{
 				return lookup;
 			}
 			
-			var targetLookup = AccessUtils.adaptLookupTo(lookup, clazz, modes);
+			var targetLookup = AccessUtils.adaptLookupTo(lookup, clazz);
 			if(strip) targetLookup = AccessUtils.stripModes(targetLookup, modes);
-			AccessUtils.requireModes(targetLookup, modes);
+			var err = AccessUtils.requireModes(targetLookup, modes);
+			if(err.isPresent()){
+				if(require){
+					throw new IllegalAccessException(err.get().get());
+				}
+				return null;
+			}
 			return targetLookup;
 		}
 		
@@ -107,45 +116,59 @@ public interface AccessProvider{
 		public VarHandle unreflect(Field field) throws IllegalAccessException{
 			var requiredMode = AccessUtils.modeFromModifiers(field.getModifiers());
 			
-			var lookup = getLookup(field.getDeclaringClass(), false, requiredMode);
+			var lookup = getLookup(field.getDeclaringClass(), false, true, requiredMode);
 			return lookup.unreflectVarHandle(field);
 		}
 		
 		@Override
 		public MethodHandle unreflect(Method method) throws IllegalAccessException{
 			var mode   = AccessUtils.modeFromModifiers(method.getModifiers());
-			var lookup = getLookup(method.getDeclaringClass(), false, mode);
+			var lookup = getLookup(method.getDeclaringClass(), false, true, mode);
 			return lookup.unreflect(method);
 		}
 		@Override
 		public MethodHandle unreflect(Constructor<?> constructor) throws IllegalAccessException{
 			var mode   = AccessUtils.modeFromModifiers(constructor.getModifiers());
-			var lookup = getLookup(constructor.getDeclaringClass(), false, mode);
+			var lookup = getLookup(constructor.getDeclaringClass(), false, true, mode);
 			return lookup.unreflectConstructor(constructor);
 		}
 		
 		@Override
-		public <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface)
+		public <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface, boolean require)
 			throws IllegalAccessException{
-			var lookup = getLookup(method.getDeclaringClass(), false, Mode.PRIVATE, Mode.MODULE);
-			return createFromCallSite(functionalInterface, lookup, lookup.unreflect(method));
+			var lookup = getLookup(method.getDeclaringClass(), false, require, Mode.PRIVATE, Mode.MODULE);
+			return lookup == null? null : createFromCallSite(functionalInterface, lookup, lookup.unreflect(method));
 		}
 		@Override
-		public <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface)
+		public <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface, boolean require)
 			throws IllegalAccessException{
-			var lookup = getLookup(constructor.getDeclaringClass(), false, Mode.PRIVATE, Mode.MODULE);
-			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
+			var lookup = getLookup(constructor.getDeclaringClass(), false, require, Mode.PRIVATE, Mode.MODULE);
+			return lookup == null? null : createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
 		}
 		@Override
-		public Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException{
-			var lookup = getLookup(target, true, Mode.PACKAGE);
+		public Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden) throws IllegalAccessException{
+			if(hidden){
+				var lookup = getLookup(target, true, true, Mode.PRIVATE, Mode.MODULE);
+				return lookup.defineHiddenClass(bytecode, true, MethodHandles.Lookup.ClassOption.NESTMATE).lookupClass();
+			}
+			var lookup = getLookup(target, true, true, Mode.PACKAGE);
 			return lookup.defineClass(bytecode);
 		}
 		
 		@Override
-		public AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException{
-			var lookup = getLookup(target, true, modes);
-			AccessUtils.requireModes(lookup, modes);
+		public Class<?> defineClassWithClassData(Class<?> target, byte[] bytecode, Object classData) throws IllegalAccessException{
+			var lookup = getLookup(target, true, true, Mode.PRIVATE, Mode.MODULE);
+			return lookup.defineHiddenClassWithClassData(bytecode, classData, true, MethodHandles.Lookup.ClassOption.NESTMATE).lookupClass();
+		}
+
+		@Override
+		public AccessProvider adapt(Class<?> target, boolean required, Mode... modes) throws IllegalAccessException{
+			var lookup = getLookup(target, true, required, modes);
+			if(lookup == null) return null;
+			var err = AccessUtils.requireModes(lookup, modes);
+			if(err.isPresent()){
+				throw new IllegalAccessException(err.get().get());
+			}
 			return new DirectLookup(lookup);
 		}
 		
@@ -200,12 +223,27 @@ public interface AccessProvider{
 	MethodHandle unreflect(Method method) throws IllegalAccessException;
 	MethodHandle unreflect(Constructor<?> constructor) throws IllegalAccessException;
 	
-	<InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface)
+	<InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface, boolean require)
 		throws IllegalAccessException;
-	<InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface)
+	<InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface, boolean require)
 		throws IllegalAccessException;
 	
-	Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException;
+	default <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface)
+		throws IllegalAccessException{ return makeLambda(method, functionalInterface, true); }
+	default <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface)
+		throws IllegalAccessException{ return makeLambda(constructor, functionalInterface, true); }
 	
-	AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException;
+	default Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException{
+		return defineClass(target, bytecode, false);
+	}
+	Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden) throws IllegalAccessException;
+	default Class<?> defineClassWithClassData(Class<?> target, byte[] bytecode, Object classData) throws IllegalAccessException{
+		throw new UnsupportedOperationException();
+	}
+	
+	default AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException{
+		return adapt(target, true, modes);
+	}
+	
+	AccessProvider adapt(Class<?> target, boolean require, Mode... modes) throws IllegalAccessException;
 }

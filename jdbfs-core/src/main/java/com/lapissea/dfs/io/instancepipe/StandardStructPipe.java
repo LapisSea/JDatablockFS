@@ -5,6 +5,7 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -13,26 +14,24 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
+import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.function.Supplier;
-
-import static com.lapissea.dfs.type.field.StoragePool.IO;
 
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
-	
-	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
-		return (t, structFields, testRun) -> {
-			var fields = IOFieldTools.stepFinal(structFields, List.of(
-				IOFieldTools::dependencyReorder,
-				IOFieldTools::mergeBitSpace
-			));
-			return new PipeFieldCompiler.Result<>(fields);
-		};
-	}
 	
 	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
 		var pip = StandardStructPipe.of(instance.getThisStruct(), StructPipe.STATE_DONE);
@@ -58,16 +57,19 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return of(StandardStructPipe.class, struct, minRequestedStage);
 	}
 	
-	@SuppressWarnings("unchecked")
-	public static <T extends IOInstance<T>, P extends StandardStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
-		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)StandardStructPipe.class, newType);
+	private static <T extends IOInstance<T>> PipeFieldCompiler.Result<T> standardCompile(Struct<T> t, FieldSet<T> structFields, boolean testRun){
+		var fields = IOFieldTools.stepFinal(structFields, List.of(
+			IOFieldTools::dependencyReorder,
+			IOFieldTools::mergeBitSpace
+		));
+		return new PipeFieldCompiler.Result<>(fields);
 	}
 	
 	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, int syncStage){
 		super(type, compiler, syncStage);
 	}
 	public StandardStructPipe(Struct<T> type, int syncStage){
-		super(type, compiler(), syncStage);
+		super(type, StandardStructPipe::standardCompile, syncStage);
 	}
 	
 	@Override
@@ -86,6 +88,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 //			skipCheck(ioPool, provider, instance, src, genericContext);
 //		}
 		
+		return genericDoRead(ioPool, provider, src, instance, genericContext);
+	}
+	private T genericDoRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		FieldSet<T> fields = getSpecificFields();
 		for(IOField<T, ?> field : fields){
 			readField(ioPool, provider, src, instance, genericContext, field);
@@ -117,9 +122,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static final int SKIP_FIXED = 0;
-	private static final int SKIP       = 1;
-	private static final int READ       = 2;
+	static final int SKIP_FIXED = 0;
+	static final int SKIP       = 1;
+	static final int READ       = 2;
 	
 	private record SkipData<T extends IOInstance<T>>(FieldSet<T> fields, byte[] cmds, boolean needsInstance, boolean needsPool){ }
 	
@@ -171,12 +176,29 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		
 		FieldSet<T>    fields = report.allFields();
 		List<CmdBuild> cmds   = new ArrayList<>(fields.size());
+
+		// Only variable-size skips need values. Include prerequisites of the reads they require,
+		// and map unpacked bit fields back to the merged field that must be read as a whole.
+		var owners = new HashMap<IOField<T, ?>, IOField<T, ?>>();
+		var pending = new ArrayDeque<IOField<T, ?>>();
+		for(var field : fields){
+			for(var unpacked : field.iterUnpackedFields()){
+				owners.put(unpacked, field);
+				if(field.getSizeDescriptor().getFixed(WordSpace.BYTE).isEmpty()) pending.addAll(unpacked.getDependencies());
+			}
+		}
+		var requiredReads = new HashSet<IOField<T, ?>>();
+		while(!pending.isEmpty()){
+			var dependency = pending.removeFirst();
+			var owner = owners.getOrDefault(dependency, dependency);
+			if(!requiredReads.add(owner)) continue;
+			for(var unpacked : owner.iterUnpackedFields()) pending.addAll(unpacked.getDependencies());
+		}
 		
 		for(IOField<T, ?> field : fields){
 			
-			//If any other field depends on this field, then it has to be read
-			if(field.iterUnpackedFields().flatMap(fields::iterDependentOn).hasAny()){
-				var needsInstance = !field.iterUnpackedFields().allMatch(f -> f.isVirtual(IO));
+			if(requiredReads.contains(field)){
+				var needsInstance = !field.iterUnpackedFields().filter(e -> e.getAccessor() != null).allMatch(f -> f.isVirtual(StoragePool.IO));
 				cmds.add(new CmdBuild.Read(needsInstance, field.needsIOPool()));
 				continue;
 			}
@@ -233,6 +255,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var pool = skip.needsPool? makeIOPool() : null;
 		var inst = skip.needsInstance? getType().make() : null;
 		
+		skipFields(pool, provider, src, inst, genericContext);
+	}
+
+	protected void skipFields(VarPool<T> pool, DataProvider provider, ContentReader src, T inst, GenericContext genericContext) throws IOException{
+		var skip = skipData();
 		var cmds = skip.cmds;
 		for(int f = 0, c = 0; c<cmds.length; f++){
 			switch(cmds[c++]){
@@ -248,4 +275,70 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			}
 		}
 	}
+	
+	record SkipStep(int operation, long bytes, IOField<?, ?> field){ }
+
+	List<SkipStep> skipSteps(){
+		var skip = skipData();
+		if(skip == null) return List.of();
+		var result = new ArrayList<SkipStep>();
+		var cmds = skip.cmds;
+		for(int f = 0, c = 0; c<cmds.length; f++){
+			int operation = cmds[c++];
+			if(operation == SKIP_FIXED){
+				result.add(new SkipStep(operation, BBView.readInt8(cmds, c), null));
+				c += 8;
+				f += BBView.readInt4(cmds, c);
+				c += 4;
+			}else result.add(new SkipStep(operation, 0, skip.fields.get(f)));
+		}
+		return result;
+	}
+
+	private T genericReadNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		return super.readNew(provider, src, genericContext);
+	}
+	
+	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
+		var fields = makeSTDFields(objType);
+		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields);
+	}
+	
+	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
+		var fields = makeSTDFields(objType);
+		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields);
+	}
+	
+	@Override
+	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
+		return Match.of((cw, type, constants) -> {
+			PipeCodeGen.defaultClassDef(cw);
+			
+			boolean hasReadyStruct = getType().getInitializationState()>=Struct.STATE_INIT_FIELDS;
+			cw.field(boolean.class, "DEBUG_READY_READ")
+			  .visibility(Visibility.PUBLIC).staticFinal(e -> e.val(hasReadyStruct));
+			
+			List<SpecializedGenerator> generators;
+			if(hasReadyStruct){
+				for(int i = 0; i<10; i++){
+					if(getInitializationState()>=STATE_IO_FIELD) break;
+					UtilL.sleep(2);
+				}
+				if(getInitializationState()>=STATE_IO_FIELD){
+					var fields = getSpecificFields();
+					generators = PipeCodeGen.getSpecializedGenerators(type, fields);
+				}else{
+					Log.info("Delaying codegen to boostrap because {}#yellow is not ready", this);
+					generators = null;
+				}
+			}else generators = null;
+			
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants, this);
+		});
+	}
+	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){
+		var struct = Struct.of(type, Struct.STATE_FIELD_MAKE);
+		return standardCompile(struct, struct.getFields(), false).fields();
+	}
+	
 }

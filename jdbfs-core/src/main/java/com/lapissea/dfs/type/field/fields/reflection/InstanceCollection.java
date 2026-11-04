@@ -24,6 +24,11 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -69,8 +74,11 @@ public class InstanceCollection{
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
-				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+				Behaviour.<IOValue, T>of(IOValue.class, BehaviourSupport::collectionLength)
+				         .disableIf((field, ann) -> field.hasAnnotation(IOValue.Reference.class)),
+				Behaviour.of(IOValue.Reference.class, BehaviourSupport::reference),
+				Behaviour.<IONullability, T>of(IONullability.class, BehaviourSupport::ioNullability)
+				         .disableIf((field, ann) -> field.hasAnnotation(IOValue.Reference.class))
 			);
 		}
 	}
@@ -101,15 +109,18 @@ public class InstanceCollection{
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
-				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+				Behaviour.<IOValue, T>of(IOValue.class, BehaviourSupport::collectionLength)
+				         .disableIf((field, ann) -> field.hasAnnotation(IOValue.Reference.class)),
+				Behaviour.of(IOValue.Reference.class, BehaviourSupport::reference),
+				Behaviour.<IONullability, T>of(IONullability.class, BehaviourSupport::ioNullability)
+				         .disableIf((field, ann) -> field.hasAnnotation(IOValue.Reference.class))
 			);
 		}
 	}
 	
 	public static final class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends NullFlagCompanyField<T, CollectionType>
-		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>{
+		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>, SpecializedGenerator{
 		
 		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
@@ -196,11 +207,34 @@ public class InstanceCollection{
 		
 		@Override
 		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
+
+		@Override
+		public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			injectWriteFieldNullable(body, accessMap, null, writer -> {
+				var value = accessMap.temporaryLocalField(getType(), "instanceCollection", writer);
+				writer.set(value);
+				accessMap.getConstant(dataAdapter, CollectionAdapter.class, writer);
+				writer.call("write", args -> args.get(value).get("provider").get("dest"));
+			});
+		}
+
+		@Override
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+			injectReadFieldNullable(body, accessMap, null, value -> {
+				accessMap.getConstant(dataAdapter, CollectionAdapter.class, value);
+				value.call("read", args -> {
+					accessMap.get(collectionSize, args);
+					args.get("provider").get("src");
+					accessMap.getFieldRef(this, args);
+					args.call("makeContext", context -> context.get("genericContext"));
+				}).cast(getType());
+			});
+		}
 	}
 	
 	public static final class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends RefField.ReferenceCompanion<T, CollectionType>
-		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>{
+		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>, SpecializedGenerator{
 		
 		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
@@ -281,7 +315,7 @@ public class InstanceCollection{
 		
 		@Override
 		protected Set<TypeFlag> computeTypeFlags(){
-			return Set.of();
+			return Set.of(TypeFlag.IO_INSTANCE);
 		}
 		
 		@Override
@@ -356,6 +390,28 @@ public class InstanceCollection{
 		
 		@Override
 		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
+
+		@Override
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			var reference = getDependencies().requireExact(Reference.class, FieldNames.ref(getAccessor()));
+			CodeArg read = value -> {
+				accessMap.get(reference, value);
+				value.call("read", args -> {
+					args.get("provider");
+					accessMap.getConstant(refPipe, ObjectPipe.class, args);
+					accessMap.getFieldRef(this, args);
+					args.call("makeContext", context -> context.get("genericContext"));
+				}).cast(getType());
+			};
+			accessMap.set(getAccessor(), body, value -> {
+				if(nullable()){
+					accessMap.get(reference, value);
+					value.call("isNull").ifTrue(empty -> empty.nullVal(getType())).elseRun(read);
+				}else{
+					read.accept(value);
+				}
+			});
+		}
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})

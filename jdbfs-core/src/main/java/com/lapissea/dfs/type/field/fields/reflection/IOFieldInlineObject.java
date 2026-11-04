@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
@@ -16,6 +17,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -23,6 +25,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -32,7 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
-public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType> implements SpecializedGenerator{
 	
 	@SuppressWarnings({"unused", "rawtypes", "unchecked"})
 	private static final class Usage implements FieldUsage{
@@ -93,7 +97,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 		var desc = instancePipe.getSizeDescriptor();
 		
 		var fixedSiz = desc.getFixed();
-		if(fixedSiz.isPresent()){
+		if(fixedSiz.isPresent() && (fixed || !nullable())){
 			initSizeDescriptor(SizeDescriptor.Fixed.of(desc.getWordSpace(), fixedSiz.getAsLong()));
 		}else{
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
@@ -101,7 +105,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				nullable()? 0 : desc.getMin(),
 				desc.getMax(),
 				(ioPool, prov, inst) -> {
-					var val = get(null, inst);
+					var val = get(ioPool, inst);
 					if(val == null){
 						if(!nullable()) throw new NullPointerException();
 						return 0;
@@ -185,7 +189,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 			boolean isNull = getIsNull(ioPool, instance);
 			if(isNull){
 				if(fixed){
-					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					src.skipExact(getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}
@@ -195,5 +199,31 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 	
 	public StructPipe<ValueType> getInstancePipe(){
 		return instancePipe;
+	}
+	
+	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		injectWriteFieldNullable(body, accessMap, empty -> {
+			if(fixed) empty.call(IOUtils.class, "zeroFill", args -> args.get("dest").val(getSizeDescriptor().requireFixed(WordSpace.BYTE)));
+		}, writer -> {
+			var value = accessMap.temporaryLocalField(getType(), "inlineValue", writer);
+			writer.set(value);
+			accessMap.getConstant(instancePipe, StructPipe.class, writer);
+			writer.call("write", args -> args.get("provider").get("dest").get(value));
+		});
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		injectReadFieldNullable(body, accessMap, skip -> {
+			if(fixed){
+				skip.get("src").call("skipExact", List.of(getSizeDescriptor().requireFixed(WordSpace.BYTE)));
+			}
+		}, bod -> {
+			accessMap.readStruct(instancePipe, bod, arg -> {
+				accessMap.getFieldRef(this, arg);
+				arg.call("makeContext", a -> a.get("genericContext"));
+			});
+		});
 	}
 }

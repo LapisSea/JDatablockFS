@@ -14,11 +14,15 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.FieldNames;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -26,7 +30,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
-public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends RefField.ReferenceCompanion<T, ValueType> implements RefField.Inst<T, ValueType>{
+public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends RefField.ReferenceCompanion<T, ValueType> implements RefField.Inst<T, ValueType>, SpecializedGenerator{
 	
 	
 	private final Struct<ValueType>     struct;
@@ -131,5 +135,31 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext){
 		//nothing to do. Reference field stores the actual pointer
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		var referenceField = getDependencies().requireExact(Reference.class, FieldNames.ref(getAccessor()));
+		accessMap.set(getAccessor(), body, value -> {
+			accessMap.get(referenceField, value);
+			value.call("isNull").ifTrue(isNull -> {
+				switch(getNullability()){
+					case NULLABLE -> isNull.nullVal(getType());
+					case NOT_NULL -> isNull.throwNew(NullPointerException.class);
+					case DEFAULT_IF_NULL -> {
+						accessMap.getConstant(struct, Struct.class, isNull);
+						isNull.call("make").cast(getType());
+					}
+				}
+			}).elseRun(present -> {
+				accessMap.get(referenceField, present);
+				present.call("readNew", args -> {
+					args.get("provider");
+					accessMap.getConstant(instancePipe, StructPipe.class, args);
+					accessMap.getFieldRef(this, args);
+					args.call("makeContext", ctx -> ctx.get("genericContext"));
+				}).cast(getType());
+			});
+		});
 	}
 }

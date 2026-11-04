@@ -193,6 +193,7 @@ public final class VaryingSize implements Stringify{
 			private record Mark(int counter, Map<String, UIDInfo> uidMap){ }
 			
 			private final List<NumberSize> data;
+			private final List<Integer> ids;
 			private       int              counter;
 			
 			private final Map<Integer, Mark> marks = new HashMap<>();
@@ -201,7 +202,11 @@ public final class VaryingSize implements Stringify{
 			private final Map<String, UIDInfo> uidMap = new HashMap<>();
 			
 			public Repeater(List<NumberSize> data){
+				this(data, null);
+			}
+			private Repeater(List<NumberSize> data, List<Integer> ids){
 				this.data = List.copyOf(data);
+				this.ids = ids == null? null : List.copyOf(ids);
 			}
 			
 			@Override
@@ -212,7 +217,7 @@ public final class VaryingSize implements Stringify{
 					return repeat.val;
 				}
 				
-				var result = new VaryingSize(data.get(counter), counter);
+				var result = new VaryingSize(data.get(counter), ids == null? counter : ids.get(counter));
 				
 				if(uid != null) uidMap.put(uid, new UIDInfo(result, max, ptr));
 				counter++;
@@ -253,6 +258,10 @@ public final class VaryingSize implements Stringify{
 			return new Repeater(data);
 		}
 		
+		static Provider repeatSizes(List<VaryingSize> data){
+			return new Repeater(data.stream().map(v -> v.size).toList(), data.stream().map(v -> v.id).toList());
+		}
+
 		static Provider constLimit(NumberSize size, int id){
 			if(size == NumberSize.LARGEST) return ALL_MAX;
 			return new NoMark(){

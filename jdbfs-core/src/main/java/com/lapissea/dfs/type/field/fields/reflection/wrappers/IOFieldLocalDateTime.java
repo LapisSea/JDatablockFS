@@ -18,6 +18,8 @@ import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
@@ -47,7 +49,7 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends I
 	private static MethodHandle CONSTR;
 	
 	@IOInstance.Order({"date", "time"})
-	private interface IOLocalDateTime extends IOInstance.Def<IOLocalDateTime>{
+	public interface IOLocalDateTime extends IOInstance.Def<IOLocalDateTime>{
 		
 		static String toString(IOLocalDateTime val){
 			return val.getData().toString();
@@ -135,5 +137,10 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends I
 	@Override
 	protected void skipValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		instancePipe.skip(provider, src, genericContext);
+	}
+	@Override
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.readStruct(instancePipe, body, a -> a.nullVal(GenericContext.class));
+		body.call("getData");
 	}
 }

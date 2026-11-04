@@ -25,7 +25,7 @@ import java.util.Set;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class BitField<T extends IOInstance<T>, Type> extends IOField<T, Type>
-	permits BitField.NoIO, IOFieldEnum, IOFieldPrimitive.FBoolean{
+	permits BitField.NoIO, IOFieldEnum, IOFieldPrimitive.FBoolean, IOFieldPrimitive.FBooleanBoxed{
 	
 	public static final class NoIO<T extends IOInstance<T>, Type> extends BitField<T, Type>{
 		

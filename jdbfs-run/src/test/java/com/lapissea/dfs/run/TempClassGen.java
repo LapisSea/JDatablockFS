@@ -3,24 +3,29 @@ package com.lapissea.dfs.run;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.compilation.JorthUtils;
 import com.lapissea.iterableplus.Iters;
-import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.ClassDefinition;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.random.RandomGenerator;
+import java.util.stream.Stream;
 
 public final class TempClassGen{
 	
 	public interface CodePart{
-		void write(CodeStream dest);
+		void write2(CodeBlock body);
 	}
 	
 	public sealed interface CtorType{
@@ -30,17 +35,13 @@ public final class TempClassGen{
 			}
 		}
 		
+		record Some(List<String> fieldNames) implements CtorType{ }
+		
 		record All() implements CtorType{ }
 	}
 	
-	public enum VisiblityGen{
-		PRIVATE,
-		PROTECTED,
-		PUBLIC
-	}
-	
 	public record FieldGen(
-		String name, VisiblityGen visibility, boolean isFinal, Type type,
+		String name, Visibility visibility, boolean isFinal, Type type,
 		Iterable<Annotation> annotations, Function<RandomGenerator, Object> generator
 	){
 		@Override
@@ -69,12 +70,20 @@ public final class TempClassGen{
 		}
 	}
 	
-	public record ClassGen(String name, List<FieldGen> fields, Set<CtorType> constructors, Class<?> parent, List<Annotation> annotations){
+	public record ClassGen(
+		String name,
+		List<FieldGen> fields,
+		Set<CtorType> constructors,
+		Class<?> parent,
+		List<Annotation> annotations,
+		List<UnsafeConsumer<ClassDefinition, MalformedJorth>> extras
+	){
 		public ClassGen{
 			Objects.requireNonNull(name);
 			Objects.requireNonNull(fields);
 			Objects.requireNonNull(constructors);
 			Objects.requireNonNull(annotations);
+			Objects.requireNonNull(extras);
 		}
 		
 		@Override
@@ -91,7 +100,10 @@ public final class TempClassGen{
 			       "\n}";
 		}
 		public ClassGen withName(String name){
-			return new ClassGen(name, fields, constructors, parent, annotations);
+			return new ClassGen(name, fields, constructors, parent, annotations, List.of());
+		}
+		public ClassGen withAnnotation(Annotation annotation){
+			return new ClassGen(name, fields, constructors, parent, Stream.concat(annotations.stream(), Stream.of(annotation)).toList(), List.of());
 		}
 	}
 	
@@ -117,76 +129,79 @@ public final class TempClassGen{
 	}
 	private static byte[] makeClass(ClassLoader cl, ClassGen classGen){
 		try{
-			return Jorth.generateClass(cl, classGen.name, code -> {
-				JorthUtils.writeAnnotations(code, classGen.annotations);
-				if(classGen.parent != null){
-					code.write("extends {}", classGen.parent);
-				}
-				code.write("public class {!} start", classGen.name);
-				if(classGen.parent != null){
-					code.write(
-						"""
-							function <clinit> start
-								static call {} allowFullAccess start
-									static call {} lookup
-								end
-							end
-							""", IOInstance.class, MethodHandles.class);
-				}
-				
-				for(FieldGen field : classGen.fields){
-					JorthUtils.writeAnnotations(code, field.annotations);
-					if(field.isFinal) code.write("final");
-					code.write("{} field {!} {}", field.visibility, field.name, field.type);
-				}
-				
-				for(var ctor : classGen.constructors){
-					switch(ctor){
-						case CtorType.All all -> {
-							code.write(
-								"""
-									public function <init>
-										template-for #field in {0} start
-											arg #field.name #field.type
-										end
-									start
-										super start end
-										template-for #field in {0} start
-											get #arg #field.name
-											set this #field.name
-										end
-									end
-									""", classGen.fields);
-						}
-						case CtorType.Empty empty -> {
-							code.write(
-								"""
-									public function <init> start
-										super start end
-									""");
-							for(var e : empty.values.entrySet()){
-								var name = e.getKey();
-								if(Iters.from(classGen.fields).map(FieldGen::name).noneEquals(name)){
-									throw new IllegalArgumentException(name + " is not a field");
-								}
-								var val = e.getValue();
-								if(val instanceof CodePart block){
-									block.write(code);
-								}else{
-									code.write("{}", val);
-								}
-								code.write("set this {!}", name);
+			var cw = new ClassDefinition(cl).finalAcc();
+			JorthUtils.writeAnnotations(cw, classGen.annotations);
+			if(classGen.parent != null){
+				cw.extendsType(classGen.parent);
+			}
+			cw.name(ClassName.dotted(classGen.name));
+			
+			if(classGen.parent != null){
+				cw.staticInit()
+				  .body()
+				  .call(IOInstance.class, "allowFullAccess", e -> e.call(MethodHandles.class, "lookup"));
+			}
+			
+			for(FieldGen field : classGen.fields){
+				var f = cw.field(field.type, field.name).visibility(field.visibility);
+				if(field.isFinal) f.finalAcc();
+				JorthUtils.writeAnnotations(f, field.annotations);
+			}
+			
+			for(var ctor : classGen.constructors){
+				switch(ctor){
+					case CtorType.All ignored -> writeFieldsCtor(cw, classGen.fields);
+					case CtorType.Empty empty -> {
+						var body = cw.instanceInit()
+						             .body()
+						             .callSuper(e -> { });
+						
+						for(var e : empty.values.entrySet()){
+							var name = e.getKey();
+							if(Iters.from(classGen.fields).map(FieldGen::name).noneEquals(name)){
+								throw new IllegalArgumentException(name + " is not a field");
 							}
-							code.wEnd();
+							var val = e.getValue();
+							if(val instanceof CodePart block){
+								block.write2(body);
+							}else{
+								body.val(val);
+							}
+							body.setThis(name);
 						}
 					}
+					case CtorType.Some(var names) -> {
+						List<FieldGen> list = new ArrayList<>(names.size());
+						for(String name : names){
+							list.add(classGen.fields.stream().filter(e -> e.name.equals(name)).findFirst().orElseThrow());
+						}
+						writeFieldsCtor(cw, list);
+					}
 				}
-				
-				code.wEnd();
-			});
+				for(var extra : classGen.extras){
+					extra.accept(cw);
+				}
+			}
+			
+			return cw.getClassFile();
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class", e);
 		}
 	}
+	private static void writeFieldsCtor(ClassDefinition cw, List<FieldGen> fields) throws MalformedJorth{
+		var init = cw.instanceInit();
+		
+		for(FieldGen field : fields){
+			init.arg(field.type, field.name);
+		}
+		var body = init.body()
+		               .callSuper(e -> { });
+		
+		for(FieldGen field : fields){
+			body.get(field.name)
+			    .setThis(field.name);
+		}
+	}
+
 	
 }

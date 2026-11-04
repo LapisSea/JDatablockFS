@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -14,16 +15,19 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, boolean[]>{
+public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, boolean[]> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<boolean[]>{
@@ -97,4 +101,31 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 		int size = arraySize.getValue(ioPool, instance);
 		src.skipExact(BitUtils.bitsToBytes(size));
 	}
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(arraySize, args);
+			args.cast(long.class).add(7).bitShiftRight(true, 3);
+		});
+	}
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		var arr = accessMap.temporaryLocalField(boolean[].class, "boolArrResult", body);
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			bod.newObj(boolean[].class, arg -> {
+				   accessMap.get(arraySize, arg);
+			   })
+			   .set(arr)
+			   .newObj(BitInputStream.class, args -> {
+				   args.get("src");
+				   accessMap.get(arraySize, args);
+				   args.cast(long.class);
+			   })
+			   .dup()
+			   .call("readBits", arg -> arg.get(arr)).pop()
+			   .call("close")
+			   .get(arr);
+		});
+	}
+	
 }

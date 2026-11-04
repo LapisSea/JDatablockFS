@@ -7,11 +7,15 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.BytecodeUtils;
-import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.TextUtil;
 
 import java.lang.invoke.MethodHandles;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -47,53 +51,36 @@ public final class WrapperStructs{
 		var typeName  = makeTypeName(type);
 		var className = WrapperStructs.class.getPackageName() + "." + Wrapper.class.getSimpleName() + "€" + typeName;
 		try{
-			var file = Jorth.generateClass(FieldCompiler.class.getClassLoader(), className, writer -> {
-				writer.addImportAs(Wrapper.class, "Wrapper");
-				writer.addImports(IOValue.class, Override.class, TextUtil.class);
-				writer.write(
-					"""
-						extends #Wrapper<{!0}>
-						public final class {!0} start
-							@ #IOValue
-							private field val {1}
-						
-							public function <init> start
-								super start end
-							end
-						
-							public function <init>
-								arg val {1}
-							start
-								super start end
-								get #arg val
-								set this val
-							end
-						
-							public function get
-								returns #Object
-							start
-								get this val
-							end
-						
-							@ #Override
-							public function toString
-								returns #String
-							start
-								new #StringBuilder
-								call append start 'WrapperOf€{!2}{' end
-								call append start
-									static call #TextUtil toString start
-										get this val
-									end
-								end
-								call append start '}' end
-								call toString
-							end
-						end
-						""",
-					className, type, typeName
-				);
-			});
+			var cw    = new ClassDefinition(FieldCompiler.class.getClassLoader());
+			var cType = ClassName.dotted(className);
+			
+			cw.name(cType).extendsType(GenericType.of(Wrapper.class).withArgs(cType))
+			  .finalAcc();
+			
+			var val = cw.field(type, "val").annotation(IOValue.class).visibility(Visibility.PRIVATE);
+			cw.instanceInit().body().callSuperAutoPass();
+			
+			cw.instanceInit()
+			  .arg(type, "val")
+			  .body()
+			  .callSuper(e -> { })
+			  .get("val")
+			  .setThis(val);
+			
+			cw.function("get")
+			  .returns(Object.class)
+			  .body()
+			  .getThis(val);
+			
+			cw.function("toString").override()
+			  .body()
+			  .newObj(StringBuilder.class)
+			  .call("append", List.of("WrapperOf€" + type.getSimpleName() + "{"))
+			  .call("append", args -> args.call(TextUtil.class, "toString", a -> a.getThis(val)))
+			  .call("append", List.of("}"))
+			  .call("toString");
+			
+			var file = cw.getClassFile();
 			
 			var lookup = MethodHandles.privateLookupIn(WrapperStructs.class, MethodHandles.lookup());
 			try{

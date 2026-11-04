@@ -10,6 +10,8 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -20,11 +22,47 @@ import static java.util.stream.Collectors.joining;
 
 public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int dims, List<JType> args) implements JType{
 	
-	public static final GenericType OBJECT = new GenericType(ClassName.of(Object.class));
-	public static final GenericType STRING = new GenericType(ClassName.of(String.class));
-	public static final GenericType INT    = new GenericType(ClassName.of(int.class));
-	public static final GenericType BOOL   = new GenericType(ClassName.of(boolean.class));
-	public static final GenericType FLOAT  = new GenericType(ClassName.of(float.class));
+	public static final GenericType OBJECT = GenericType.of(Object.class);
+	public static final GenericType STRING = GenericType.of(String.class);
+	public static final GenericType BYTE   = GenericType.of(byte.class);
+	public static final GenericType CHAR   = GenericType.of(char.class);
+	public static final GenericType SHORT  = GenericType.of(short.class);
+	public static final GenericType INT    = GenericType.of(int.class);
+	public static final GenericType LONG   = GenericType.of(long.class);
+	public static final GenericType BOOL   = GenericType.of(boolean.class);
+	public static final GenericType FLOAT  = GenericType.of(float.class);
+	public static final GenericType DOUBLE = GenericType.of(double.class);
+	public static final GenericType VOID   = GenericType.of(void.class);
+	
+	public static GenericType of(ClassName name){
+		var any = name.any();
+		if(any.isEmpty() || any.charAt(0) != '['){
+			return new GenericType(name);
+		}
+		return parseArray(name);
+	}
+	private static GenericType parseArray(ClassName name){
+		var dotted    = name.dotted();
+		int arrayDims = 0;
+		while(arrayDims<dotted.length() - 1 && dotted.charAt(arrayDims) == '['){
+			arrayDims++;
+		}
+		
+		var component = switch(dotted.charAt(arrayDims)){
+			case 'L' -> dotted.substring(arrayDims + 1, dotted.length() - 1);
+			case 'I' -> "int";
+			case 'J' -> "long";
+			case 'Z' -> "boolean";
+			case 'B' -> "byte";
+			case 'C' -> "char";
+			case 'S' -> "short";
+			case 'F' -> "float";
+			case 'D' -> "double";
+			default -> throw new IllegalArgumentException("Unknown array component descriptor: " + dotted);
+		};
+		
+		return new GenericType(ClassName.dotted(component), Optional.empty(), arrayDims, List.of());
+	}
 	
 	public static GenericType of(Type type){
 		return of0(null, type);
@@ -67,7 +105,7 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 			}
 			stack.add(var);
 			var bounds = var.getBounds()[0];
-			return of0(stack, bounds);
+			return of0(stack, bounds).withTypeArgName(ClassName.dotted(var.getName()));
 		}
 		if(type instanceof WildcardType w){
 			var up = w.getUpperBounds();
@@ -84,6 +122,9 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	public GenericType(ClassName raw, Optional<ClassName> typeArgName, int dims, List<JType> args){
 		this.raw = Objects.requireNonNull(raw);
 		this.typeArgName = Objects.requireNonNull(typeArgName);
+		if(typeArgName.isPresent() && (BaseType.ofPrimitive(raw) != null || raw.any().equals("void"))){
+			throw new IllegalArgumentException("Type variable bound must be a reference type: " + raw);
+		}
 		this.dims = dims;
 		this.args = List.copyOf(args);
 	}
@@ -164,7 +205,7 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 		if(thisInfo != null) return true;
 		
 		//Instance of an object and not primitive, always true
-		if(right.equals(GenericType.OBJECT)) return true;
+		if(right.withTypeArgName(Optional.empty()).equals(GenericType.OBJECT)) return true;
 		
 		if(dims != right.dims) return false;
 		
@@ -198,6 +239,27 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 		       );
 	}
 	
+	public GenericType withArgs(JType... args){
+		return withArgs(List.of(args));
+	}
+	public GenericType withArgs(ClassName... args){
+		return withArgs(Arrays.stream(args).<JType>map(GenericType::of).toList());
+	}
+	public GenericType withArgs(Type... args){
+		return withArgs(Arrays.asList(args));
+	}
+	public GenericType withArgs(Collection<Type> args){
+		JType[] arr = new JType[args.size()];
+		int     i   = 0;
+		for(Type arg : args){
+			arr[i++] = GenericType.of(arg);
+		}
+		return withArgs(List.of(arr));
+	}
+	public GenericType withArgs(List<JType> args){
+		return new GenericType(raw, typeArgName, dims, args);
+	}
+	
 	@Override
 	public GenericType withoutArgs(){
 		if(args.isEmpty()) return this;
@@ -206,5 +268,17 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	
 	public GenericType withDims(int dims){
 		return new GenericType(raw, typeArgName, dims, args);
+	}
+	public GenericType withTypeArgName(ClassName typeArgName){
+		return withTypeArgName(Optional.of(typeArgName));
+	}
+	public GenericType withTypeArgName(Optional<ClassName> typeArgName){
+		Objects.requireNonNull(typeArgName);
+		if(this.typeArgName.equals(typeArgName)) return this;
+		return new GenericType(raw, typeArgName, dims, args);
+	}
+	
+	public GenericType arrayType(){
+		return withDims(dims + 1);
 	}
 }

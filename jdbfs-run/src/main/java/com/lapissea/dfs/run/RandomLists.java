@@ -173,6 +173,9 @@ public final class RandomLists{
 					});
 				}
 				cl.defragment();
+				for(int i = 0; i<listCount; i++){
+					cl.roots().drop("list" + i);
+				}
 			}finally{
 				if(logger != null){
 					logger.block();

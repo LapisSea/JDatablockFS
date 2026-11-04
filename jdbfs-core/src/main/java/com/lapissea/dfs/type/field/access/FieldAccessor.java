@@ -8,6 +8,19 @@ import com.lapissea.util.NotNull;
 
 public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedType, Comparable<FieldAccessor<CTyp>>, FieldNames.Named{
 	
+	interface FieldOrMethod{
+		sealed interface AccessType{
+			record Field(Class<?> declaringClass, String name) implements AccessType{ }
+			
+			record Method(String name) implements AccessType{ }
+		}
+		AccessType getter();
+		AccessType setter();
+	}
+	
+	/**
+	 * @return integer that is an ID defined in {@link TypeFlag}. For example {@link TypeFlag#ID_INT}
+	 */
 	int getTypeID();
 	boolean genericTypeHasArgs();
 	

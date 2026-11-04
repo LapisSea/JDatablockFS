@@ -1,34 +1,48 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.IllegalConditionalMerge;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.exceptions.MissingLocalField;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
+import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.ConstantCallSite;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.DoubleUnaryOperator;
+import java.util.function.IntFunction;
+import java.util.function.IntSupplier;
 import java.util.stream.Collectors;
 
-import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
-import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
+import static com.lapissea.jorth.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class JorthTests{
 	public interface UnsafeBiPredicate<T, U, E extends Exception>{
 		boolean test(T t, U u) throws E;
-	}
-	
-	static{
-		Thread.startVirtualThread(() -> new Jorth(null, null));
 	}
 	
 	public static class TestCls{
@@ -65,26 +79,197 @@ public class JorthTests{
 	}
 	
 	@Test
-	void comparisonTest() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+	void childStackCanInspectInheritedValuesAndConsumeOwnValues() throws MalformedJorth{
+		var parent = new TypeStack(null);
+		parent.push(GenericType.INT);
+		var child   = new TypeStack(parent);
+		var sibling = new TypeStack(parent);
+		child.requireElements(1);
+		assertThat(child.peek(0)).isEqualTo(GenericType.INT);
+		assertThat(child.peekLast()).isEqualTo(GenericType.INT);
+		child.push(GenericType.STRING);
+		assertThat(child.pop()).isEqualTo(GenericType.STRING);
+		assertThat(child.totalStack()).containsExactly(GenericType.INT);
+		assertThat(parent.totalStack()).containsExactly(GenericType.INT);
+		assertThat(sibling.totalStack()).containsExactly(GenericType.INT);
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class,
+	      expectedExceptionsMessageRegExp = "can not pop values outside the code path")
+	void inheritedPopPreservesParentAndSiblingStacks() throws MalformedJorth{
+		var parent = new TypeStack(null);
+		parent.push(GenericType.INT);
+		var child   = new TypeStack(parent);
+		var sibling = new TypeStack(parent);
+		try{
+			child.pop();
+		}finally{
+			assertThat(parent.totalStack()).containsExactly(GenericType.INT);
+			assertThat(sibling.totalStack()).containsExactly(GenericType.INT);
+			assertThat(child.totalStack()).containsExactly(GenericType.INT);
+		}
+	}
+	
+	@Test
+	void branchesCanLoadAndConsumeLocals() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd ->
+			                                                    cd.function("run").staticAcc().arg(String.class, "value").arg(boolean.class, "condition")
+			                                                      .returns(int.class).body().get("condition")
+			                                                      .ifTrue(b -> b.get("value").call("length").returnOp())
+			                                                      .elseRun(b -> b.get("value").call("length").add(1).returnOp()));
+		var method = cls.getMethod("run", String.class, boolean.class);
+		assertThat(method.invoke(null, "hello", true)).isEqualTo(5);
+		assertThat(method.invoke(null, "hello", false)).isEqualTo(6);
+	}
+	
+	@Test
+	void multidimensionalArrays() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.function("ints").staticAcc().returns(int[][].class).body().newObj(int[][].class, args -> args.val(2).val(3));
+			cd.function("strings").staticAcc().returns(String[][][].class).body().newObj(String[][][].class, args -> args.val(2).val(3).val(4));
+			cd.function("empty").staticAcc().returns(long[][][].class).body().newObj(long[][][].class, args -> args.val(2).val(0).val(4));
+		});
+		var ints = (int[][])cls.getMethod("ints").invoke(null);
+		assertThat(ints.length).isEqualTo(2);
+		for(var row : ints) assertThat(row).containsExactly(0, 0, 0);
+		assertThat(ints[0]).isNotSameAs(ints[1]);
+		var strings = (String[][][])cls.getMethod("strings").invoke(null);
+		assertThat(strings.length).isEqualTo(2);
+		for(var plane : strings){
+			assertThat(plane.length).isEqualTo(3);
+			for(var row : plane) assertThat(row).containsExactly(null, null, null, null);
+		}
+		var empty = (long[][][])cls.getMethod("empty").invoke(null);
+		assertThat(empty.length).isEqualTo(2);
+		for(var plane : empty) assertThat(plane).isEmpty();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void multidimensionalArrayRequiresAllLengths() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd ->
+			                                          cd.function("run").staticAcc().body().newObj(int[][].class, args -> args.val(2)));
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Array size is not an integer")
+	void multidimensionalArrayRejectsNonIntegerLength() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd ->
+			                                          cd.function("run").staticAcc().body().newObj(int[][].class, args -> args.val(2L).val(3)));
+	}
+	
+	@Test
+	void explicitPrimitiveConversions() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var takeLong = cd.function("takeLong").staticAcc().arg(long.class, "x").returns(long.class);
+			takeLong.body().get("x").returnOp();
+			var takeInteger = cd.function("takeInteger").staticAcc().arg(Integer.class, "x").returns(Integer.class);
+			takeInteger.body().get("x").returnOp();
+			cd.function("returnLong").staticAcc().returns(long.class).body().val(5).cast(long.class).returnOp();
+			cd.function("callLong").staticAcc().returns(long.class).body().val(5).cast(long.class).call(takeLong);
+			cd.function("callInteger").staticAcc().returns(Integer.class).body().val(5).box().call(takeInteger);
+		});
+		assertThat(cls.getMethod("returnLong").invoke(null)).isEqualTo(5L);
+		assertThat(cls.getMethod("callLong").invoke(null)).isEqualTo(5L);
+		assertThat(cls.getMethod("callInteger").invoke(null)).isEqualTo(5);
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void returnRequiresExplicitWidening() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd ->
+			                                          cd.function("run").staticAcc().returns(long.class).body().val(5).returnOp());
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void callRequiresExplicitWidening() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd -> {
+			var target = cd.function("target").staticAcc().arg(long.class, "x").returns(long.class);
+			target.body().get("x");
+			cd.function("run").staticAcc().returns(long.class).body().val(5).call(target);
+		});
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void callRequiresExplicitBoxing() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd -> {
+			var target = cd.function("target").staticAcc().arg(Integer.class, "x").returns(Integer.class);
+			target.body().get("x");
+			cd.function("run").staticAcc().returns(Integer.class).body().val(5).call(target);
+		});
+	}
+	
+	public static class AutoPassSuper{
+		public int doubleAndAdd(int x){
+			return x*2 + 1;
+		}
+	}
+	
+	@Test
+	void callSuperAutoPassForwardsArguments() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.extendsType(AutoPassSuper.class);
+			cd.function("doubleAndAdd").arg(int.class, "x").returns(int.class)
+			  .body().callSuperAutoPass().add(1);
+		});
+		var instance = cls.getConstructor().newInstance();
+		assertThat(cls.getMethod("doubleAndAdd", int.class).invoke(instance, 41)).isEqualTo(41*2 + 1 + 1);
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class,
+	      expectedExceptionsMessageRegExp = "Cannot use 'this' from a static function")
+	void callSuperAutoPassRejectsStaticContext() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.extendsType(AutoPassSuper.class);
+			cd.function("doubleAndAdd").staticAcc().arg(int.class, "x").returns(int.class)
+			  .body().callSuperAutoPass();
+		});
+	}
+	
+	@Test
+	void voidReturnsIgnoreRemainingStackValues() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.function("implicit").staticAcc().body()
+			  .val(1).val(2L).val(3.0).val("incidental");
+			cd.function("explicit").staticAcc().body()
+			  .val(1).val(2L).val(3.0).val("incidental").returnOp();
+		});
+		assertThat(cls.getMethod("implicit").invoke(null)).isNull();
+		assertThat(cls.getMethod("explicit").invoke(null)).isNull();
+	}
+	
+	@Test
+	void repeatedBodyCallsShareOneConcreteFunction() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var fn = cd.function("run").staticAcc().arg(int.class, "value").returns(int.class);
+			assertThat(fn.access().isAbstract()).isTrue();
 			
-			for(var typ : List.of("#String", "int")){
-				writer.write(
-					"""
-						static function compare
-							arg arg1 {0}
-							arg arg2 {0}
-							returns boolean
-						start
-							get #arg arg1
-							get #arg arg2
-							==
-						end
-						""",
-					typ);
+			var body = fn.body();
+			assertThat(fn.access().isAbstract()).isFalse();
+			assertThat(cd.getClassInfo().getFunction(fn.makeSignature())).isSameAs(fn);
+			assertThat(fn.body()).isSameAs(body);
+			
+			body.get("value");
+			fn.body().add(2);
+			fn.body().returnOp();
+			assertThat(fn.body()).isSameAs(body);
+		});
+		assertThat(cls.getDeclaredMethods()).hasSize(1);
+		var method = cls.getMethod("run", int.class);
+		assertThat(Modifier.isAbstract(method.getModifiers())).isFalse();
+		assertThat(method.invoke(null, 40)).isEqualTo(42);
+	}
+	
+	@Test
+	void comparisonTest() throws Exception{
+		
+		var cls = generateAndLoadInstanceSimple(autoName(), classDefinition -> {
+			for(var typ : List.of(GenericType.STRING, GenericType.INT)){
+				var fn = classDefinition.function("compare")
+				                        .staticAcc()
+				                        .arg(typ, "arg1").arg(typ, "arg2")
+				                        .returns(boolean.class);
+				fn.body()
+				  .get("arg1")
+				  .get("arg2")
+				  .equalityOp();
 			}
 		});
 		var testStr = cls.getMethod("compare", String.class, String.class);
@@ -111,28 +296,22 @@ public class JorthTests{
 	}
 	
 	@Test
-	void ifTest() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.write(
-				"""
-					static function test
-						arg index int
-						returns #String
-					start
-						get #arg index 1 ==
-						if start
-							'ay'
-							return
-						end
-						new #StringBuilder
-						call append start 'lmao ' end
-						call append start get #arg index end
-						call toString
-					end
-					""");
+	void ifTest() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var fn = cd.function("test").staticAcc()
+			           .arg(GenericType.INT, "index")
+			           .returns(GenericType.STRING);
+			fn.body()
+			  .get("index")
+			  .val(1)
+			  .ifEquality(code -> {
+				  code.val("ay")
+				      .returnOp();
+			  })
+			  .newObj(StringBuilder.class)
+			  .call("append", List.of("lmao "))
+			  .call("append", c -> c.get("index"))
+			  .call("toString");
 		});
 		
 		var test = cls.getMethod("test", int.class);
@@ -142,52 +321,341 @@ public class JorthTests{
 		assertThat(test.invoke(null, 2)).isEqualTo("lmao 2");
 	}
 	
+	private static final List<String> ifElseCalls = new ArrayList<>();
+	private static void ifElseReport(String value){
+		ifElseCalls.add(value);
+	}
+	
 	@Test
-	void functionCallTest() throws ReflectiveOperationException{
+	void ifElseTest() throws Exception{
+		var className = autoName();
+		var cls = generateAndLoadInstanceSimple(className, cd -> {
+			var list = cd.field(GenericType.of(List.class).withArgs(String.class), "list")
+			             .staticFinal(e -> e.newObj(ArrayList.class));
+			
+			var report = cd.function("report").staticAcc()
+			               .arg(String.class, "str");
+			report.body()
+			      .get(list)
+			      .call("add", c -> c.get("str"))
+			      .pop();
+			
+			cd.function("test").staticAcc().arg(int.class, "index")
+			  .body()
+			  .call(report, c -> c.val("start"))
+			  .get("index")
+			  .val(0)
+			  .equalityOp()
+			  .ifTrue(code -> {
+				  code.call(report, c -> c.val("ay"));
+			  }).elseRun(code -> {
+				  code.call(report, c -> c.val("lmao"));
+			  })
+			  .call(report, c -> c.val("end"));
+			
+		});
+		//noinspection unchecked
+		var list = (List<String>)cls.getField("list").get(null);
 		
-		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", writer -> {
-			writer.addImport(LogUtil.class);
-			writer.addImportAs(TestCls.class, "TestCls");
-			writer.write(
-				"""
-					
-					static function printToConsole
-					start
-						static call #LogUtil println start
-							'AAAYYYY LMAO'
-						end
-					end
-					
-					static function testFlag
-						arg obj #TestCls
-					start
-						get #arg obj
-						call flag
-					
-						static call {} staticFlag
-					end
-					
-					function concatCal
-						arg a #String
-						arg b #String
-						returns #String
-					start
-						new #StringBuilder start get #arg a end
-						call append start get #arg b end
-						call toString
-					end
-					
-					function useCall
-						returns #String
-					start
-						get this this
-						'ay '
-						call concat start
-							'lmao'
-						end
-					end
-					""",
-				TestCls.class.getName());
+		var test = cls.getMethod("test", int.class);
+		
+		list.clear();
+		test.invoke(null, 0);
+		assertThat(list).containsExactly("start", "ay", "end");
+		
+		list.clear();
+		test.invoke(null, 1);
+		assertThat(list).containsExactly("start", "lmao", "end");
+	}
+	
+	@DataProvider
+	Object[][] equalityTypes(){
+		return new Object[][]{
+			{Object.class, new Object(), new Object(), false},
+			{Object.class, "same", "same", true},
+			{int.class, 1, 2, false},
+			{int.class, 42, 42, true},
+			{long.class, 1L, 2L, false},
+			{long.class, 999L, 999L, true},
+			{float.class, 1.0f, 2.0f, false},
+			{float.class, 3.14f, 3.14f, true},
+			{double.class, 1.0, 2.0, false},
+			{double.class, 2.718, 2.718, true},
+			{boolean.class, true, false, false},
+			{boolean.class, true, true, true},
+			{char.class, 'a', 'b', false},
+			{char.class, 'x', 'x', true},
+			{byte.class, (byte)1, (byte)2, false},
+			{byte.class, (byte)7, (byte)7, true},
+			{short.class, (short)1, (short)2, false},
+			{short.class, (short)10, (short)10, true},
+			};
+	}
+	
+	@Test(dataProvider = "equalityTypes")
+	void ifEqualsBranch(Class<?> type, Object arg1, Object arg2, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(type, "a").arg(type, "b")
+			           .returns(int.class);
+			fn.body()
+			  .get("a")
+			  .get("b")
+			  .ifEquality(code -> {
+				  code.val(1)
+				      .returnOp();
+			  })
+			  .val(2);
+		});
+		
+		var method    = cls.getMethod("check", type, type);
+		int generated = (int)method.invoke(null, arg1, arg2);
+		
+		int expected = expectedEqual? 1 : 2;
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
+	@Test(dataProvider = "equalityTypes")
+	void ifNotEqualsBranch(Class<?> type, Object arg1, Object arg2, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(type, "a").arg(type, "b")
+			           .returns(int.class);
+			fn.body()
+			  .get("a")
+			  .get("b")
+			  .ifNotEquality(code -> {
+				  code.val(1)
+				      .returnOp();
+			  })
+			  .val(2);
+		});
+		
+		var method    = cls.getMethod("check", type, type);
+		int generated = (int)method.invoke(null, arg1, arg2);
+		
+		int expected = expectedEqual? 2 : 1;
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
+	@Test(dataProvider = "equalityTypes")
+	void ifEqualsElseBranch(Class<?> type, Object arg1, Object arg2, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(type, "a").arg(type, "b")
+			           .returns(int.class);
+			fn.body()
+			  .get("a")
+			  .get("b")
+			  .ifEquality(code -> {
+				  code.val(1)
+				      .returnOp();
+			  })
+			  .elseRun(code -> {
+				  code.val(2)
+				      .returnOp();
+			  });
+		});
+		
+		var method    = cls.getMethod("check", type, type);
+		int generated = (int)method.invoke(null, arg1, arg2);
+		
+		int expected = expectedEqual? 1 : 2;
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
+	
+	@DataProvider
+	Object[][] ifMergeCases(){
+		
+		return new Object[][]{
+			{true, true, true, true},
+			{true, true, true, false},
+			{true, false, true, true},
+			{true, false, true, false},
+			{true, false, false, true},
+			{true, false, false, false},
+			{false, true, true, true},
+			{false, true, true, false},
+			{false, false, true, true},
+			{false, false, true, false},
+			};
+	}
+	
+	@Test(dataProvider = "ifMergeCases")
+	void ifElseConditionalMergeTest(boolean returnsInTrue, boolean returnsInFalse, boolean hasFalse, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(int.class, "a")
+			           .returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+				    if(returnsInTrue) code.returnOp();
+			    });
+			if(hasFalse){
+				body.elseRun(code -> {
+					code.val(2);
+					if(returnsInFalse) code.returnOp();
+				});
+			}else{
+				body.val(2);
+			}
+			if(!returnsInTrue || !returnsInFalse){
+				body.returnOp();
+			}
+		});
+		
+		var method    = cls.getMethod("check", int.class);
+		int generated = (int)method.invoke(null, expectedEqual? 3 : 4);
+		int expected  = expectedEqual? 1 : 2;
+		
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifBranchStackCountMismatchThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+			    })
+			    .elseRun(code -> { });
+			body.returnOp();
+		});
+	}
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifBranchStackCountMismatchThrows2() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+			    });
+			body.returnOp();
+		});
+	}
+	
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifBranchStackTypeMismatchThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+			    })
+			    .elseRun(code -> {
+				    code.val(1L);
+			    });
+			body.returnOp();
+		});
+	}
+	
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifNoElseImplicitMergeMismatchThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			// no else: implicit false-branch is "entry stack unchanged" —
+			// true-branch pushing a value with nothing consuming it after must fail
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1); // extra int left on stack, no else to match it against
+			    });
+			body.returnOp();
+		});
+	}
+	
+	private static void generateLazyBlock(CodeArg code) throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted("test.LazyBlockTermination"));
+		cd.function("run").staticAcc().returns(int.class).body().lazyBlock(code).val(0);
+		cd.getClassFile();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "lazyBlock must not terminate")
+	void lazyBlockRejectsReturn() throws Exception{
+		generateLazyBlock(b -> b.val(1).returnOp());
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "lazyBlock must not terminate")
+	void lazyBlockRejectsTerminatingBranches() throws Exception{
+		generateLazyBlock(b -> b.val(true).ifTrue(c -> c.val(1).returnOp()).elseRun(c -> c.val(2).returnOp()));
+	}
+	
+	@Test
+	void lazyBlockAllowsFallthrough() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd ->
+			                                                    cd.function("run").staticAcc().arg(int.class, "value").returns(int.class).body()
+			                                                      .lazyBlock(b -> b.val(42).set("value"))
+			                                                      .get("value").returnOp()
+		);
+		assertThat(cls.getMethod("run", int.class).invoke(null, 0)).isEqualTo(42);
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = ".*block has terminated.*")
+	void bothBranchesTerminateThenUnreachableAccessThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+				    code.returnOp();
+			    })
+			    .elseRun(code -> {
+				    code.val(2);
+				    code.returnOp();
+			    });
+			// both branches terminate — this point is unreachable;
+			// trying to keep building here (or requiring a final implicit return) should fail
+			body.returnOp();
+		});
+	}
+	
+	@Test
+	void functionCallTest() throws Exception{
+		
+		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", cd -> {
+			cd.function("printToConsole").staticAcc()
+			  .body()
+			  .call(LogUtil.class, "println", c -> c.val("AAAYYYY LMAO"));
+			
+			cd.function("testFlag").staticAcc().arg(TestCls.class, "obj")
+			  .body()
+			  .get("obj")
+			  .call("flag")
+			  .call(TestCls.class, "staticFlag", c -> { });
+			
+			cd.function("concatCal")
+			  .arg(String.class, "a").arg(String.class, "b").returns(String.class)
+			  .body()
+			  .newObj(StringBuilder.class, c -> c.get("a"))
+			  .call("append", c -> c.get("b"))
+			  .call("toString");
+			
+			cd.function("useCall").returns(String.class)
+			  .body()
+			  .get("this")
+			  .val("ay ")
+			  .call("concat", List.of("lmao"));
 		});
 		TestCls test = new TestCls();
 		assertThat(test.flag).isFalse();
@@ -201,36 +669,19 @@ public class JorthTests{
 	}
 	
 	@Test
-	void fieldClass() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+	void fieldClass() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var ts = cd.field(String.class, "testString");
 			
-			writer.write(
-				"""
-					public field testString #String
-					"""
-			);
+			cd.function("toString").returns(String.class)
+			  .body()
+			  .getThis(ts);
 			
-			writer.write(
-				"""
-					function toString
-						returns #String
-					start
-						get this testString
-					end
-					""");
-			
-			writer.write(
-				"""
-					function init
-						arg testString #String
-					start
-						get #arg testString
-						set this testString
-					end
-					""");
+			cd.function("init").arg(String.class, "testString")
+			  .body()
+			  .get("this")
+			  .get("testString")
+			  .setField(ts);
 		});
 		
 		var constr = cls.getConstructor();
@@ -244,19 +695,11 @@ public class JorthTests{
 	}
 	
 	@Test
-	void fieldArrayClass() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			
-			writer.write(
-				"""
-					public field noArray #String
-					public field 1dArray #String array
-					public field 2dArray #String array array
-					"""
-			);
+	void fieldArrayClass() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.field(String.class, "noArray");
+			cd.field(String[].class, "1dArray");
+			cd.field(String[][].class, "2dArray");
 		});
 		
 		for(Field field : cls.getFields()){
@@ -300,21 +743,13 @@ public class JorthTests{
 	}
 	
 	@Test
-	void defaultAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.addImportAs(DefaultAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 321 end
-					public field a #String
-					
-					@ #Ann
-					public field b #String
-					"""
-			);
+	void defaultAnnotation() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.field(String.class, "a")
+			  .annotation(DefaultAnn.class, a -> a.arg("value", 321));
+			
+			cd.field(String.class, "b")
+			  .annotation(DefaultAnn.class);
 		});
 		var a = (DefaultAnn)cls.getField("a").getDeclaredAnnotations()[0];
 		var b = (DefaultAnn)cls.getField("b").getDeclaredAnnotations()[0];
@@ -323,36 +758,20 @@ public class JorthTests{
 	}
 	
 	@Test
-	void enumAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.addImportAs(EnumAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value CLASS end
-					public field a #String
-					"""
-			);
+	void enumAnnotation() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.field(String.class, "a")
+			  .annotation(EnumAnn.class, a -> a.arg("value", RetentionPolicy.CLASS));
 		});
 		var a = (EnumAnn)cls.getField("a").getDeclaredAnnotations()[0];
 		assertThat(a.value()).isEqualTo(RetentionPolicy.CLASS);
 	}
 	
 	@Test
-	void fieldAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.addImportAs(MultiAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 141 lol 'xD' end
-					public field testString #String
-					"""
-			);
+	void fieldAnnotation() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.field(String.class, "testString")
+			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"));
 		});
 		var anns = cls.getFields()[0].getDeclaredAnnotations();
 		LogUtil.println((Object[])anns);
@@ -363,18 +782,11 @@ public class JorthTests{
 	}
 	
 	@Test
-	void methodAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.addImportAs(MultiAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 141 lol 'xD' end
-					public function test start end
-					"""
-			);
+	void methodAnnotation() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.function("test")
+			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"))
+			  .body();
 		});
 		var anns = cls.getMethod("test").getAnnotations();
 		LogUtil.println((Object[])anns);
@@ -384,19 +796,11 @@ public class JorthTests{
 		assertThat(ann.value()).isEqualTo(141);
 	}
 	@Test
-	void classAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.addImportAs(MultiAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 141 lol 'xD' end
-					public class {!} start end
-					""",
-				className
-			);
+	void classAnnotation() throws Exception{
+		var className = autoName();
+		var cls = generateAndLoadInstance(className, cd -> {
+			cd.name(ClassName.dotted(className))
+			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"));
 		});
 		var anns = cls.getAnnotations();
 		LogUtil.println((Object[])anns);
@@ -407,20 +811,10 @@ public class JorthTests{
 	}
 	
 	@Test
-	void overrideClass() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					extends {!1}
-					public class {!0} start
-					end
-					""",
-				className,
-				ISayHello.class.getName()
-			);
+	void overrideClass() throws Exception{
+		var className = autoName();
+		var cls = generateAndLoadInstance(className, cd -> {
+			cd.name(ClassName.dotted(className)).extendsType(ISayHello.class);
 		});
 		
 		var constr = cls.getConstructor();
@@ -433,20 +827,10 @@ public class JorthTests{
 	}
 	
 	@Test
-	void dummyClass() throws ReflectiveOperationException{
+	void dummyClass() throws Exception{
 		var msg = "Ayyyy it works!";
-		
-		var className = "jorth.Gen$$";
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.write(
-				"""
-					function toString
-						returns #String
-					start
-						'{}'
-					end
-					""",
-				msg);
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.function("toString").returns(String.class).body().val(msg);
 		});
 		
 		var constr = cls.getConstructor();
@@ -458,18 +842,14 @@ public class JorthTests{
 	
 	@SuppressWarnings("unchecked")
 	@Test
-	<T extends Enum<T>> void simpleEnum() throws ReflectiveOperationException{
+	<T extends Enum<T>> void simpleEnum() throws Exception{
 		
 		var className = "com.lapissea.jorth.WtfIsMyEnumAAA";
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					public enum {!} start
-						enum FOO
-						enum BAR
-					end
-					""",
-				className);
+		var cls = generateAndLoadInstance(className, cd -> {
+			cd.name(ClassName.dotted(className))
+			  .type(ClassType.ENUM);
+			cd.enumConstant("FOO");
+			cd.enumConstant("BAR");
 		});
 		cls.getEnumConstants();
 		
@@ -477,19 +857,202 @@ public class JorthTests{
 	}
 	
 	@Test
-	<T extends Enum<T>> void simpleInterface() throws ReflectiveOperationException{
-		
-		var className = "test.Interf";
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					public interface {!} start
-						function hello
-							returns #String
-						end
-					end
-					""",
-				className);
+	void enumConstructorArguments() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var code  = cd.field(int.class, "code").finalAcc();
+			var label = cd.field(String.class, "label").finalAcc();
+			// User parameters may have the same names as the JVM's implicit parameters.
+			cd.instanceInit().arg(String.class, "name")
+			  .arg(int.class, "ordinal").body()
+			  .get("this").get("name").setField(label)
+			  .get("this").get("ordinal").setField(code);
+			cd.enumConstant("OK", c -> c.val("Success").val(200));
+			cd.enumConstant("MISSING", c -> c.val("Not found").val(404));
+		});
+		var constants = cls.getEnumConstants();
+		assertThat(constants).hasSize(2);
+		for(int i = 0; i<constants.length; i++){
+			var constant = (Enum<?>)constants[i];
+			assertThat(constant.name()).isEqualTo(i == 0? "OK" : "MISSING");
+			assertThat(constant.ordinal()).isEqualTo(i);
+			assertThat(cls.getField("code").get(constant)).isEqualTo(i == 0? 200 : 404);
+			assertThat(cls.getField("label").get(constant)).isEqualTo(i == 0? "Success" : "Not found");
+		}
+		assertThat(cls.getDeclaredConstructors()).hasSize(1);
+		var constructor = cls.getDeclaredConstructors()[0];
+		assertThat(Modifier.isPrivate(constructor.getModifiers())).isTrue();
+		assertThat(constructor.getParameterTypes()).containsExactly(String.class, int.class, String.class, int.class);
+	}
+	
+	@Test
+	void enumConstructorOverloads() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var value = cd.field(int.class, "value").finalAcc();
+			cd.instanceInit().body()
+			  .get("this")
+			  .get("this").call("ordinal")
+			  .setField(value);
+			cd.instanceInit().arg(int.class, "value").body()
+			  .get("this").get("value").setField(value);
+			cd.instanceInit().arg(String.class, "value").body()
+			  .get("this").get("value").call("length").setField(value);
+			cd.enumConstant("DEFAULT");
+			cd.enumConstant("INTEGER", c -> c.val(42));
+			cd.enumConstant("STRING", c -> c.val("hello"));
+		});
+		var constants = cls.getEnumConstants();
+		assertThat(cls.getField("value").get(constants[0])).isEqualTo(0);
+		assertThat(cls.getField("value").get(constants[1])).isEqualTo(42);
+		assertThat(cls.getField("value").get(constants[2])).isEqualTo(5);
+		assertThat(cls.getDeclaredConstructors()).hasSize(3);
+	}
+	
+	@Test
+	void enumConstantsBeforeUserStaticInitialization() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var snapshot = cd.field(new GenericType(cd.name()).arrayType(), "snapshot").staticFinal();
+			// Declare this before the constants to ensure declaration order is irrelevant.
+			cd.staticInit().body()
+			  .call(cd.name(), "values")
+			  .setField(snapshot);
+			cd.enumConstant("FIRST");
+			cd.enumConstant("SECOND");
+		});
+		assertThat((Object[])cls.getField("snapshot").get(null)).containsExactly(cls.getEnumConstants());
+		var values = (Object[])cls.getMethod("values").invoke(null);
+		values[0] = null;
+		assertThat((Object[])cls.getMethod("values").invoke(null)).containsExactly(cls.getEnumConstants());
+	}
+	
+	private static final AtomicInteger enumArgumentCalls = new AtomicInteger();
+	public static int enumArgument(int value){
+		enumArgumentCalls.incrementAndGet();
+		return value;
+	}
+	
+	@Test
+	void enumArgumentExpressionsExecuteOnce() throws Exception{
+		enumArgumentCalls.set(0);
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var value = cd.field(int.class, "value").finalAcc();
+			cd.instanceInit().arg(int.class, "value").body()
+			  .get("this").get("value").setField(value);
+			cd.enumConstant("FIRST", c -> c.call(JorthTests.class, "enumArgument", a -> a.val(11)));
+			cd.enumConstant("SECOND", c -> c.call(JorthTests.class, "enumArgument", a -> a.val(22)));
+		});
+		assertThat(enumArgumentCalls.get()).isEqualTo(2);
+		var constants = cls.getEnumConstants();
+		assertThat(cls.getField("value").get(constants[0])).isEqualTo(11);
+		assertThat(cls.getField("value").get(constants[1])).isEqualTo(22);
+		cls.getMethod("values").invoke(null);
+		cls.getMethod("values").invoke(null);
+		assertThat(enumArgumentCalls.get()).isEqualTo(2);
+	}
+	
+	@Test
+	void enumWideConstructorArguments() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var large    = cd.field(long.class, "large").finalAcc();
+			var fraction = cd.field(double.class, "fraction").finalAcc();
+			cd.instanceInit().arg(long.class, "$enum$name")
+			  .arg(double.class, "$enum$ordinal")
+			  .body()
+			  .get("this").get("$enum$name").setField(large)
+			  .get("this").get("$enum$ordinal").setField(fraction);
+			cd.enumConstant("FIRST", c -> c.val(1234567890123L).val(1.25));
+			cd.enumConstant("SECOND", c -> c.val(-9876543210987L).val(-2.5));
+		});
+		var constants = cls.getEnumConstants();
+		assertThat(cls.getField("large").get(constants[0])).isEqualTo(1234567890123L);
+		assertThat(cls.getField("large").get(constants[1])).isEqualTo(-9876543210987L);
+		assertThat(cls.getField("fraction").get(constants[0])).isEqualTo(1.25);
+		assertThat(cls.getField("fraction").get(constants[1])).isEqualTo(-2.5);
+		assertThat(((Enum<?>)constants[0]).name()).isEqualTo("FIRST");
+		assertThat(((Enum<?>)constants[1]).ordinal()).isEqualTo(1);
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsExplicitConstructorInvocation() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().body()
+		  .get("this").call("<init>", List.of("ILLEGAL", 0));
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsMissingConstructorMatch() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().arg(int.class, "value").body();
+		cd.enumConstant("MISSING");
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsWrongConstructorArgument() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().arg(int.class, "value").body();
+		cd.enumConstant("WRONG", c -> c.val("text"));
+	}
+	
+	@Test
+	void emptyEnum() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> cd.type(ClassType.ENUM));
+		assertThat(cls.getEnumConstants()).isEmpty();
+		assertThat((Object[])cls.getMethod("values").invoke(null)).isEmpty();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsDuplicateConstructor() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().arg(int.class, "first").body();
+		cd.instanceInit().arg(int.class, "second").body();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsConstructorDeclaredAfterConstant() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.enumConstant("FIRST");
+		cd.instanceInit().arg(int.class, "value").body();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsConstructorBodyDefinedAfterConstant() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().body();
+		cd.instanceInit().arg(int.class, "value");
+		cd.enumConstant("FIRST");
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsDuplicateConstants() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.enumConstant("SAME");
+		cd.enumConstant("SAME");
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsDirectConstruction() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.enumConstant("ONLY");
+		cd.function("make").staticAcc().returns(new GenericType(cd.name())).body()
+		  .newObj(cd.name(), c -> c.val("ILLEGAL").val(0));
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsExplicitSuperclassCall() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().body().callSuper(c -> c.val("ILLEGAL").val(0));
+	}
+	
+	@Test
+	<T extends Enum<T>> void simpleInterface() throws Exception{
+		var className = autoName();
+		var cls = generateAndLoadInstance(className, cd -> {
+			cd.type(ClassType.INTERFACE).name(ClassName.dotted(className));
+			cd.function("hello").returns(String.class);
 		});
 		assertThat(cls).isInterface();
 		var hello = cls.getMethod("hello");
@@ -498,17 +1061,10 @@ public class JorthTests{
 	}
 	
 	@Test
-	void getClassRef() throws ReflectiveOperationException{
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
-			writer.write(
-				"""
-					static function getCls
-						returns #Class<#String>
-					start
-						class #String
-					end
-					"""
-			);
+	void getClassRef() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.function("getCls").staticAcc().returns(Class.class, String.class)
+			  .body().val(String.class);
 		});
 		
 		var expected = String.class;
@@ -517,28 +1073,14 @@ public class JorthTests{
 		assertThat(actual).isEqualTo(expected);
 	}
 	@Test
-	void superArgs() throws ReflectiveOperationException{
-		
-		var className   = "jorth.Gen$$";
+	void superArgs() throws Exception{
+		var className   = autoName();
 		var expectedStr = "Hi from super";
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					extends {!1}
-					public class {!0} start
-					
-						function <init> start
-							super start
-								'{2}'
-							end
-						end
-					
-					end
-					""",
-				className,
-				IStoreHello.class.getName(),
-				expectedStr
-			);
+		var cls = generateAndLoadInstance(className, cd -> {
+			cd.name(ClassName.dotted(className)).extendsType(IStoreHello.class);
+			cd.instanceInit()
+			  .body()
+			  .callSuper(c -> c.val(expectedStr));
 		});
 		
 		var constr = cls.getConstructor();
@@ -550,13 +1092,8 @@ public class JorthTests{
 	
 	@Test
 	void genericFieldDefine() throws Exception{
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
-			writer.addImport(Optional.class);
-			writer.write(
-				"""
-					field optStr #Optional<#String>
-					"""
-			);
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.field(GenericType.of(Optional.class).withArgs(String.class), "optStr");
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
@@ -567,21 +1104,14 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "genericFieldDefine")
 	void genericField() throws Exception{
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
-			writer.addImport(Optional.class);
-			writer.write(
-				"""
-					field optStr #Optional<#String>
-					
-					function set
-						arg optStr #Optional<#String>
-					start
-						get #arg optStr
-						set this optStr
-					end
-					
-					"""
-			);
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var optStr = cd.field(GenericType.of(Optional.class).withArgs(String.class), "optStr");
+			
+			cd.function("set")
+			  .arg(GenericType.of(Optional.class).withArgs(String.class), "optStr")
+			  .body()
+			  .get("optStr")
+			  .setThis(optStr);
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
@@ -618,25 +1148,13 @@ public class JorthTests{
 			assertThat(typ.getUpperBounds()).containsExactly(Object.class);
 		}
 		
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
-			writer.addImport(List.class);
-			writer.addImport(Typ.class);
-			writer.write(
-				"""
-					
-					function upper
-						arg arg #List<? extends #JorthTests.Typ>
-					start end
-					
-					function lower
-						arg arg #List<? super #JorthTests.Typ>
-					start end
-					
-					function wild
-						arg arg #List<?>
-					start end
-					"""
-			);
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.function("upper")
+			  .arg(GenericType.of(List.class).withArgs(JType.upper(Typ.class)), "arg").body();
+			cd.function("lower")
+			  .arg(GenericType.of(List.class).withArgs(JType.lower(Typ.class)), "arg").body();
+			cd.function("wild")
+			  .arg(GenericType.of(List.class).withArgs(JType.WILDCARD), "arg").body();
 		});
 		
 		{
@@ -659,19 +1177,16 @@ public class JorthTests{
 	
 	@Test
 	void sealedClass() throws Exception{
-		var cls = generateAndLoadInstance("SealedClass", writer -> {
-			writer.write(
-				"""
-					permits child1
-					permits child2
-					public class SealedClass start end
-					
-					extends SealedClass
-					final class child1 start end
-					extends SealedClass
-					final class child2 start end
-					"""
-			);
+		var cls = generateAndLoadInstanceMulti(List.of("SealedClass", "child1", "child2"), (name, cd) -> {
+			cd.name(ClassName.dotted(name));
+			switch(name){
+				case "SealedClass" -> {
+					cd.permits(ClassName.dotted("child1")).permits(ClassName.dotted("child2"));
+				}
+				case "child1", "child2" -> {
+					cd.finalAcc().extendsType(ClassName.dotted("SealedClass"));
+				}
+			}
 		});
 		
 		var permits = cls.getPermittedSubclasses();
@@ -681,17 +1196,8 @@ public class JorthTests{
 	
 	@Test
 	void parmClass() throws Exception{
-		var cls = generateAndLoadInstance("ParmClass", writer -> {
-			writer.addImport(CharSequence.class);
-			writer.addImport(List.class);
-			writer.write(
-				"""
-					type-arg T #CharSequence
-					public class ParmClass start
-					
-					end
-					"""
-			);
+		var cls = generateAndLoadInstance("ParmClass", cd -> {
+			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
 		});
 		
 		var parms = cls.getTypeParameters();
@@ -703,22 +1209,12 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "parmClass")
 	void parmClassFun() throws Exception{
-		var cls = generateAndLoadInstance("ParmClass", writer -> {
-			writer.addImport(CharSequence.class);
-			writer.addImport(List.class);
-			writer.write(
-				"""
-					type-arg T #CharSequence
-					public class ParmClass start
-					
-						function takeArg
-							arg tList #List<T>
-						start
-						end
-					
-					end
-					"""
-			);
+		var cls = generateAndLoadInstance("ParmClass", cd -> {
+			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
+			
+			cd.function("takeArg")
+			  .arg(GenericType.of(List.class).withArgs(cd.getArg("T")), "tList")
+			  .body();
 		});
 		
 		var meth  = cls.getMethod("takeArg", List.class);
@@ -734,18 +1230,9 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "parmClass")
 	void parmClassField() throws Exception{
-		var cls = generateAndLoadInstance("ParmClass", writer -> {
-			writer.addImport(CharSequence.class);
-			writer.write(
-				"""
-					type-arg T #CharSequence
-					public class ParmClass start
-					
-						field arg T
-					
-					end
-					"""
-			);
+		var cls = generateAndLoadInstance("ParmClass", cd -> {
+			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
+			cd.field(cd.getArg("T"), "arg");
 		});
 		
 		var field = cls.getField("arg");
@@ -771,27 +1258,21 @@ public class JorthTests{
 	void templateFor(List<Prop> props) throws Exception{
 		
 		var name = "Props" + props.stream().map(Prop::name).collect(Collectors.joining());
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(CharSequence.class);
-			writer.write(
-				"""
-					class {0} start
-					
-						template-for #field in {1} start
-							public field #field.name #field.type
-						end
-					
-						function <init> start
-							super
-					
-							template-for #field in {1} start
-								#field.defaultVal set this #field.name
-							end
-						end
-					end
-					""",
-				name, props
-			);
+		var cls = generateAndLoadInstance(name, cd -> {
+			cd.name(ClassName.dotted(name));
+			
+			for(Prop prop : props){
+				cd.field(prop.type, prop.name);
+			}
+			var body = cd.instanceInit().body().callSuperAutoPass();
+			for(Prop prop : props){
+				switch(prop.defaultVal){
+					case Integer v -> body.val(v);
+					case Float v -> body.val(v);
+					default -> throw new NotImplementedException(prop.defaultVal.getClass().getTypeName());
+				}
+				body.setThis(cd.getField(prop.name));
+			}
 		});
 		
 		assertThat(Arrays.stream(cls.getFields()).map(Field::getName))
@@ -808,21 +1289,186 @@ public class JorthTests{
 	void templateForRaw() throws Exception{
 		var names = Set.of("a", "b", "c");
 		var name  = "Props";
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(CharSequence.class);
-			writer.write(
-				"""
-					class {0} start
-					
-						template-for #name in {1} start
-							public field #name int
-						end
-					end
-					""",
-				name, names
-			);
+		var cls = generateAndLoadInstance(name, cd -> {
+			cd.name(ClassName.dotted(name));
+			for(String s : names){
+				cd.field(int.class, s);
+			}
 		});
 		
 		assertThat(Arrays.stream(cls.getFields()).map(Field::getName)).containsExactlyInAnyOrderElementsOf(names);
+	}
+	
+	public static final class TestBootstrap{
+		public static CallSite bootstrap(MethodHandles.Lookup lookup,
+		                                 String name,
+		                                 MethodType type,
+		                                 Class<?> passType) throws Throwable{
+			var cname = lookup.lookupClass().getName() + "&_" + name;
+			
+			var cd = new ClassDefinition(null);
+			cd.name(ClassName.dotted(cname));
+			cd.function(name).staticAcc().arg(int.class, "num").returns(String.class)
+			  .body()
+			  .newObj(StringBuilder.class, c -> c.val(passType.getName() + " "))
+			  .call("append", c -> c.get("num"))
+			  .call("toString");
+			
+			byte[]               bb        = cd.getClassFile();
+			MethodHandles.Lookup implClass = lookup.defineHiddenClass(bb, true);
+			MethodHandle         target    = implClass.unreflect(implClass.lookupClass().getMethod(name, int.class));
+			return new ConstantCallSite(target);
+		}
+		
+	}
+	
+	@Test
+	void virtualCall() throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstance(name, cd -> {
+			cd.name(ClassName.dotted(name)).implement(GenericType.of(IntFunction.class).withArgs(String.class));
+			cd.function("apply").arg(int.class, "num").returns(Object.class).annotation(Override.class)
+			  .body()
+			  .callVirtual(b -> b.caller(TestBootstrap.class, "bootstrap").arg(Class.class, ClassName.dotted(name)),
+			               fn -> fn.name("makeString").arg(int.class).returns(String.class),
+			               c -> c.get("num"));
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(IntFunction.class);
+		//noinspection unchecked
+		IntFunction<String> inst = (IntFunction<String>)instO;
+		assertThat(inst.apply(1)).isEqualTo(name + " 1");
+		assertThat(inst.apply(69)).isEqualTo(name + " 69");
+	}
+	@Test(dependsOnMethods = "simpleInterface")
+	void incrementInt() throws Exception{
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
+			cb.get("num")
+			  .add(2);
+		});
+		
+		assertThat(inst.applyAsInt(10)).isEqualTo(12);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(0);
+	}
+	@Test(dependsOnMethods = "simpleInterface")
+	void incrementDouble() throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstance(name, cd -> {
+			cd.name(ClassName.dotted(name)).implement(DoubleUnaryOperator.class);
+			cd.function("applyAsDouble").arg(double.class, "num").override()
+			  .body()
+			  .get("num")
+			  .add(2.125);
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(DoubleUnaryOperator.class);
+		var inst = (DoubleUnaryOperator)instO;
+		assertThat(inst.applyAsDouble(10)).isEqualTo(12.125);
+		assertThat(inst.applyAsDouble(-2)).isEqualTo(0.125);
+	}
+	
+	@Test(dependsOnMethods = "incrementInt")
+	void variables() throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstance(name, cd -> {
+			cd.name(ClassName.dotted(name)).implement(IntSupplier.class);
+			cd.function("getAsInt").override()
+			  .body()
+			  .var(int.class, "a")
+			  .var(int.class, "b")
+			  .set("a", 1)
+			  .set("b", 2)
+			  .get("a")
+			  .add(4);
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(IntSupplier.class);
+		var inst = (IntSupplier)instO;
+		assertThat(inst.getAsInt()).isEqualTo(5);
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitShiftRight() throws Exception{
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
+			cb.get("num")
+			  .bitShiftRight(false, 2);
+		});
+		assertThat(inst.applyAsInt(10)).isEqualTo(10>>2);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2>>2);
+	}
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitShiftRightLogical() throws Exception{
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
+			cb.get("num")
+			  .bitShiftRight(true, 2);
+		});
+		assertThat(inst.applyAsInt(10)).isEqualTo(10 >>> 2);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2 >>> 2);
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitShiftLeft() throws Exception{
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
+			cb.get("num")
+			  .bitShiftLeft(2);
+		});
+		assertThat(inst.applyAsInt(10)).isEqualTo(10<<2);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2<<2);
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitAnd() throws Exception{
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
+			cb.get("num")
+			  .bitAnd(5);
+		});
+		assertThat(inst.applyAsInt(7)).isEqualTo(7&5);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2&5);
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void nullVal() throws Exception{
+		var    inst = generateInterface(autoName(), STRING_SUPPLIER, cb -> cb.nullVal(String.class));
+		String res  = inst.get();
+		assertThat(res).isNull();
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface", expectedExceptions = MissingLocalField.class)
+	void forgetLocalA() throws Exception{
+		var inst = generateInterface(autoName(), INT_SUPPLIER, cb -> cb.var(int.class, "a")
+		                                                               .set("a", 1)
+		                                                               .forgetVar("a")
+		                                                               .get("a"));
+		inst.getAsInt();
+	}
+	@Test(dependsOnMethods = "simpleInterface", expectedExceptions = MissingLocalField.class)
+	void forgetLocalB() throws Exception{
+		var inst = generateInterface(autoName(), INT_SUPPLIER, cb -> cb.scope(code -> {
+			code.var(int.class, "a")
+			    .set("a", 1);
+		}).get("a"));
+		inst.getAsInt();
+	}
+	@Test(dependsOnMethods = "simpleInterface")
+	void forgetLocalThen() throws Exception{
+		var inst = generateInterface(autoName(), INT_SUPPLIER, cb -> {
+			cb.var(int.class, "a")
+			  .set("a", 1)
+			  .scope(code -> {
+				  code.var(int.class, "b")
+				      .set("b", 2);
+			  })
+			  .var(int.class, "c")
+			  .set("c", 3)
+			  .get("c");
+		});
+		int res = inst.getAsInt();
+		assertThat(res).isEqualTo(3);
 	}
 }

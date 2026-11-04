@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.text.AutoText;
@@ -21,6 +22,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
@@ -152,5 +155,13 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	protected void skipValue(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = collectionSize.getValue(ioPool, instance);
 		adapter.skipData(size, provider, src, genericContext);
+	}
+	@Override
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		accessMap.getConstant(adapter, CollectionAdapter.class, body);
+		body.call("read", args -> {
+			accessMap.get(collectionSize, args);
+			args.get("provider").get("src").get("genericContext");
+		}).cast(getType());
 	}
 }

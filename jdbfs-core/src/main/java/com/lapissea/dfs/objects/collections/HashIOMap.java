@@ -45,6 +45,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	@SuppressWarnings({"unchecked"})
 	@StrFormat.Custom("[!!className]{@key: @value}")
 	@Order({"key", "value"})
+	@StructPipe.Special
 	private interface BucketEntry<K, V> extends IOInstance.Def<BucketEntry<K, V>>{
 		
 		Struct<BucketEntry<Object, Object>>     STRUCT = Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);

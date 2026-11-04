@@ -1,7 +1,11 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.FieldIsNull;
+import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitReader;
 import com.lapissea.dfs.io.bit.BitWriter;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -12,27 +16,38 @@ import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
+import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
+import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match.Some;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -40,7 +55,7 @@ import java.util.function.BiFunction;
 import static com.lapissea.dfs.objects.NumberSize.*;
 import static com.lapissea.dfs.type.WordSpace.BIT;
 
-public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
+public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{
@@ -56,14 +71,20 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			var res = new ArrayList<Behaviour<?, T>>(3);
 			
-			if(List.of(FLong.class, FInt.class, FShort.class).contains(fieldType)){
+			if(List.of(FIntBoxed.class, FCharBoxed.class, FLongBoxed.class, FDoubleBoxed.class, FFloatBoxed.class, FShortBoxed.class, FByteBoxed.class).contains(fieldType)){
+				res.add(Behaviour.of(IONullability.class, BehaviourSupport::ioNullability));
+			}
+			if(fieldType.equals(FBooleanBoxed.class)){
+				res.add(Behaviour.noop(IONullability.class));
+			}
+			if(List.of(FLong.class, FLongBoxed.class, FInt.class, FIntBoxed.class, FShort.class, FShortBoxed.class).contains(fieldType)){
 				res.add(Behaviour.noop(IOValue.Unsigned.class));
 			}
-			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)){
+			if(!List.of(FByte.class, FByteBoxed.class, FBoolean.class, FBooleanBoxed.class).contains(fieldType)){
 				res.add(Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())));
 			}
 			res.add(Behaviour.of(VirtualNumSize.class, (field, ann) -> {
-				if(List.of(FByte.class, FBoolean.class).contains(fieldType)){
+				if(List.of(FByte.class, FByteBoxed.class, FBoolean.class, FBooleanBoxed.class, FDouble.class, FDoubleBoxed.class, FFloat.class, FFloatBoxed.class).contains(fieldType)){
 					throw new MalformedStruct("fmt", "{}#yellow is not allowed on {}#red", VirtualNumSize.class.getName(), fieldType.getName());
 				}
 				return BehaviourSupport.virtualNumSize(field, ann);
@@ -73,31 +94,114 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){
-			return Set.of(FDouble.class, FChar.class, FFloat.class, FLong.class, FInt.class, FShort.class, FByte.class, FBoolean.class);
+			return Set.of(
+				FDouble.class, FDoubleBoxed.class,
+				FChar.class, FCharBoxed.class,
+				FFloat.class, FFloatBoxed.class,
+				FLong.class, FLongBoxed.class,
+				FInt.class, FIntBoxed.class,
+				FShort.class, FShortBoxed.class,
+				FByte.class, FByteBoxed.class,
+				FBoolean.class, FBooleanBoxed.class
+			);
 		}
+		
 	}
 	
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
+		var prim = field.getType().isPrimitive();
 		return SupportedPrimitive.get(field.getType()).map(t -> switch(t){
-			case DOUBLE -> new FDouble<>(field, null);
-			case CHAR -> new FChar<>(field, null);
-			case FLOAT -> new FFloat<>(field, null);
-			case LONG -> new FLong<>(field, null);
-			case INT -> new FInt<>(field, null);
-			case SHORT -> new FShort<>(field, null);
-			case BYTE -> new FByte<>(field, null);
-			case BOOLEAN -> new FBoolean<>(field);
+			case DOUBLE -> prim? new FDouble<>(field, null) : new FDoubleBoxed<>(field, null);
+			case CHAR -> prim? new FChar<>(field, null) : new FCharBoxed<>(field, null);
+			case FLOAT -> prim? new FFloat<>(field, null) : new FFloatBoxed<>(field, null);
+			case LONG -> prim? new FLong<>(field, null) : new FLongBoxed<>(field, null);
+			case INT -> prim? new FInt<>(field, null) : new FIntBoxed<>(field, null);
+			case SHORT -> prim? new FShort<>(field, null) : new FShortBoxed<>(field, null);
+			case BYTE -> prim? new FByte<>(field, null) : new FByteBoxed<>(field, null);
+			case BOOLEAN -> prim? new FBoolean<>(field) : new FBooleanBoxed<>(field);
 		}).orElseThrow(() -> new IllegalArgumentException(field.getType().getName() + " is not a primitive"));
 	}
 	
-	public static final class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
+	interface ReadOp{
+		void readInsn(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth;
+	}
+	
+	protected class StandardOps{
 		
-		private FDouble(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private final IOFieldPrimitive.FBoolean<T> isNull;
+		private final ReadOp                       readOp;
+		
+		StandardOps(FBoolean<T> isNull, ReadOp readOp){
+			this.isNull = isNull;
+			this.readOp = readOp;
+		}
+		
+		protected void readField(CodeBlock target, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
+			var type = getAccessor().getType();
+			accessMap.set(getAccessor(), target, body -> {
+				if(!nullable()){
+					readOp.readInsn(body, accessMap);
+					if(!type.isPrimitive()) body.box();
+					return;
+				}
+				if(getDynamicSize() == null){
+					accessMap.get(isNull, body);
+					body.ifTrue(b -> {
+						b.get("src")
+						 .call("skipExact", List.of((long)maxSize.size.bytes))
+						 .nullVal(type);
+					}).elseRun(b -> {
+						readOp.readInsn(b, accessMap);
+						if(!type.isPrimitive()) b.box();
+					});
+				}else{
+					accessMap.get(isNull, body);
+					body.ifTrue(b -> {
+						accessMap.get(getDynamicSize().field, b);
+						b.call("skip", e -> e.get("src"))
+						 .nullVal(type);
+					}).elseRun(b -> {
+						readOp.readInsn(b, accessMap);
+						if(!type.isPrimitive()) b.box();
+					});
+				}
+			});
+		}
+	}
+	
+	public abstract static sealed class FDoubleBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
+		
+		private FDoubleBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (target, accessMap) -> {
+				if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
+					throw UtilL.uncheckedThrow(new UnsupportedCodeGenType("For now doubles can only be 8 bytes"));//TODO: proper checked throw
+				}
+				target.get("src").call("readFloat8");
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, SHORT, INT, LONG);
 		}
+		
+		@Override
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null || val == 0) return Optional.empty();
+			return Optional.of(Doc.text(String.valueOf(val)));
+		}
+	}
+	
+	public static final class FDouble<T extends IOInstance<T>> extends FDoubleBase<T>{
+		
+		private FDouble(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
+		
 		@Override
 		protected IOField<T, Double> withVaryingSize(VaryingSize size){
 			return new FDouble<>(getAccessor(), size);
@@ -135,13 +239,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
-			var val = getValue(ioPool, instance);
-			if(val == 0) return Optional.empty();
-			return Optional.of(Doc.text(String.valueOf(val)));
-		}
-		
-		@Override
 		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1) == getValue(ioPool2, inst2);
 		}
@@ -151,14 +248,116 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FChar<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
+	public static final class FDoubleBoxed<T extends IOInstance<T>> extends FDoubleBase<T>{
 		
-		private FChar(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FDoubleBoxed(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+			initStd(isNull);
+		}
+		@Override
+		protected IOField<T, Double> withVaryingSize(VaryingSize size){
+			return new FDoubleBoxed<>(getAccessor(), size);
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val  = get(ioPool, instance);
+			var size = getSafeSize(ioPool, instance, VOID);
+			if(val == null){
+				if(nullable()){
+					dest.writeWord(0L, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			size.writeDouble(dest, val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size = getSafeSize(ioPool, instance, VOID);
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				size.skip(src);
+				return;
+			}
+			set(ioPool, instance, size.readDouble(src));
+		}
+		
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var v = get(ioPool, instance);
+			return v == null? 0 : Double.hashCode(v);
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+	}
+	
+	public abstract static sealed class FCharBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
+		
+		private FCharBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readIntConst(body, false);
+				}else{
+					accessMap.get(getDynamicSize().field.getAccessor(), body);
+					NumberSize.readIntDyn(body, false);
+				}
+				body.cast(char.class);
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, BYTE, SHORT);
 		}
+		
+		@Override
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			return Optional.ofNullable(get(ioPool, instance)).map(v -> Doc.text(v.toString()));
+		}
+		
+		protected void writeChar(VarPool<T> ioPool, ContentWriter dest, T instance, char val) throws IOException{
+			var size = getSafeSize(ioPool, instance, true, val);
+			size.writeInt(dest, val);
+		}
+		protected char readChar(VarPool<T> ioPool, ContentReader src, T instance) throws IOException{
+			var size = getSize(ioPool, instance);
+			return (char)size.readInt(src);
+		}
+	}
+	
+	public static final class FChar<T extends IOInstance<T>> extends FCharBase<T>{
+		
+		private FChar(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
+		
 		@Override
 		protected IOField<T, Character> withVaryingSize(VaryingSize size){
 			return new FChar<>(getAccessor(), size);
@@ -185,20 +384,14 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var val  = getValue(ioPool, instance);
-			var size = getSafeSize(ioPool, instance, true, val);
-			size.writeInt(dest, val);
+			var val = getValue(ioPool, instance);
+			writeChar(ioPool, dest, instance, val);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size = getSize(ioPool, instance);
-			setValue(ioPool, instance, (char)size.readInt(src));
-		}
-		
-		@Override
-		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
-			return Optional.of(Doc.text(String.valueOf(getValue(ioPool, instance))));
+			var val = readChar(ioPool, src, instance);
+			setValue(ioPool, instance, val);
 		}
 		
 		@Override
@@ -207,18 +400,180 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		@Override
 		public int instanceHashCode(VarPool<T> ioPool, T instance){
-			return Character.hashCode(getValue(ioPool, instance));
+			return getValue(ioPool, instance);
 		}
 	}
 	
-	public static final class FFloat<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
+	public static final class FCharBoxed<T extends IOInstance<T>> extends FCharBase<T>{
 		
-		private FFloat(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FCharBoxed(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+		}
+		
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+			initStd(isNull);
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		protected IOField<T, Character> withVaryingSize(VaryingSize size){ return new FCharBoxed<>(getAccessor(), size); }
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val = get(ioPool, instance);
+			if(val == null){
+				if(nullable()){
+					var size = getSafeSize(ioPool, instance, VOID);
+					dest.writeWord(0, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			writeChar(ioPool, dest, instance, val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				getSafeSize(ioPool, instance, VOID).skip(src);
+				return;
+			}
+			var val = readChar(ioPool, src, instance);
+			set(ioPool, instance, val);
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
+		}
+	}
+	
+	private abstract static sealed class FFloatBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
+		
+		private FFloatBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readFloatConst(body);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readFloatDyn(body);
+				}
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, SHORT, INT);
 		}
+		
+		@Override
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null) return Optional.empty();
+			return Optional.of(Doc.text(String.valueOf(val)));
+		}
+	}
+	
+	public static final class FFloatBoxed<T extends IOInstance<T>> extends FFloatBase<T>{
+		
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FFloatBoxed(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+			initStd(isNull);
+		}
+		@Override
+		protected IOField<T, Float> withVaryingSize(VaryingSize size){
+			return new FFloatBoxed<>(getAccessor(), size);
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val  = get(ioPool, instance);
+			var size = getSafeSize(ioPool, instance, VOID);
+			if(val == null){
+				if(nullable()){
+					dest.writeWord(0L, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			size.writeFloat(dest, val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size = getSafeSize(ioPool, instance, VOID);
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				size.skip(src);
+				return;
+			}
+			set(ioPool, instance, size.readFloat(src));
+		}
+		
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var v = get(ioPool, instance);
+			return v == null? 0 : Float.hashCode(v);
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+	}
+	
+	public static final class FFloat<T extends IOInstance<T>> extends FFloatBase<T>{
+		
+		private FFloat(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
+		
 		@Override
 		protected IOField<T, Float> withVaryingSize(VaryingSize size){
 			return new FFloat<>(getAccessor(), size);
@@ -256,13 +611,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
-			var val = getValue(ioPool, instance);
-			if(val == 0) return Optional.empty();
-			return Optional.of(Doc.text(String.valueOf(val)));
-		}
-		
-		@Override
 		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1) == getValue(ioPool2, inst2);
 		}
@@ -272,19 +620,59 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
+	public abstract static sealed class FLongBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
 		
-		private final boolean unsigned;
+		protected final boolean unsigned;
 		
-		private FLong(FieldAccessor<T> field, VaryingSize size){
+		private FLongBase(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
 			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
+		}
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readConst(body, !unsigned);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readDyn(body, !unsigned);
+				}
+			});
 		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.allOf(NumberSize.class);
 		}
+		
+		protected final void writeLong(VarPool<T> ioPool, ContentWriter dest, T instance, long val) throws IOException{
+			var size = getSafeSize(ioPool, instance, unsigned, val);
+			if(unsigned){
+				size.write(dest, val);
+			}else{
+				size.writeSigned(dest, val);
+			}
+		}
+		protected final long readLong(VarPool<T> ioPool, ContentReader src, T instance) throws IOException{
+			var  size = getSize(ioPool, instance);
+			long val;
+			if(unsigned){
+				val = size.read(src);
+			}else{
+				val = size.readSigned(src);
+			}
+			return val;
+		}
+		
+	}
+	
+	public static final class FLong<T extends IOInstance<T>> extends FLongBase<T>{
+		
+		private FLong(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
+		
 		@Override
 		protected IOField<T, Long> withVaryingSize(VaryingSize size){
 			return new FLong<>(getAccessor(), size);
@@ -311,24 +699,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var val  = getValue(ioPool, instance);
-			var size = getSafeSize(ioPool, instance, unsigned, val);
-			if(unsigned){
-				size.write(dest, val);
-			}else{
-				size.writeSigned(dest, val);
-			}
+			var val = getValue(ioPool, instance);
+			writeLong(ioPool, dest, instance, val);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var  size = getSize(ioPool, instance);
-			long val;
-			if(unsigned){
-				val = size.read(src);
-			}else{
-				val = size.readSigned(src);
-			}
+			long val = readLong(ioPool, src, instance);
 			setValue(ioPool, instance, val);
 		}
 		
@@ -349,24 +726,207 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
+	public static final class FLongBoxed<T extends IOInstance<T>> extends FLongBase<T>{
 		
-		private final boolean unsigned;
+		private IOFieldPrimitive.FBoolean<T> isNull;
 		
-		private FInt(FieldAccessor<T> field, VaryingSize size){
+		private FLongBoxed(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+		}
+		
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+			initStd(isNull);
+		}
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		@Override
+		protected IOField<T, Long> withVaryingSize(VaryingSize size){
+			return new FLongBoxed<>(getAccessor(), size);
+		}
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val = get(ioPool, instance);
+			if(val == null){
+				if(nullable()){
+					var size = getSafeSize(ioPool, instance, VOID);
+					dest.writeWord(0L, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			writeLong(ioPool, dest, instance, val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				getSafeSize(ioPool, instance, VOID).skip(src);
+				return;
+			}
+			long val = readLong(ioPool, src, instance);
+			set(ioPool, instance, val);
+		}
+		
+		@Override
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null) return Optional.empty();
+			return Optional.of(Doc.text(String.valueOf(val)));
+		}
+		
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			return Long.hashCode(get(ioPool, instance));
+		}
+	}
+	
+	public abstract static sealed class FIntBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
+		
+		protected final boolean unsigned;
+		
+		private FIntBase(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
 			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
 		}
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readIntConst(body, !unsigned);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readIntDyn(body, !unsigned);
+				}
+			});
+		}
+		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			var all = EnumSet.allOf(NumberSize.class);
 			all.removeIf(s -> s.greaterThan(INT));
 			return all;
 		}
+		
 		@Override
-		protected IOField<T, Integer> withVaryingSize(VaryingSize size){
-			return new FInt<>(getAccessor(), size);
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null || val == 0) return Optional.empty();
+			return Optional.of(Doc.text(String.valueOf(val)));
 		}
+		
+		protected void writeInt(VarPool<T> ioPool, ContentWriter dest, T instance, int val) throws IOException{
+			var size = getSafeSize(ioPool, instance, unsigned, val);
+			if(unsigned){
+				size.writeInt(dest, val);
+			}else{
+				size.writeIntSigned(dest, val);
+			}
+		}
+		
+		protected int readInt(VarPool<T> ioPool, ContentReader src, T instance) throws IOException{
+			var size = getSize(ioPool, instance);
+			if(unsigned){
+				return size.readInt(src);
+			}else{
+				return size.readIntSigned(src);
+			}
+		}
+	}
+	
+	public static final class FIntBoxed<T extends IOInstance<T>> extends FIntBase<T>{
+		
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FIntBoxed(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+		}
+		
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+			initStd(isNull);
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		protected IOField<T, Integer> withVaryingSize(VaryingSize size){ return new FIntBoxed<>(getAccessor(), size); }
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val = get(ioPool, instance);
+			if(val == null){
+				if(nullable()){
+					var size = getSafeSize(ioPool, instance, VOID);
+					dest.writeWord(0, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			writeInt(ioPool, dest, instance, val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				getSafeSize(ioPool, instance, VOID).skip(src);
+				return;
+			}
+			var val = readInt(ioPool, src, instance);
+			set(ioPool, instance, val);
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
+		}
+		
+	}
+	
+	public static final class FInt<T extends IOInstance<T>> extends FIntBase<T>{
+		
+		private FInt(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
+		@Override
+		protected IOField<T, Integer> withVaryingSize(VaryingSize size){ return new FInt<>(getAccessor(), size); }
 		
 		public int getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getInt(ioPool, instance);
@@ -389,32 +949,14 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var val  = getValue(ioPool, instance);
-			var size = getSafeSize(ioPool, instance, unsigned, val);
-			if(unsigned){
-				size.writeInt(dest, val);
-			}else{
-				size.writeIntSigned(dest, val);
-			}
+			int val = getValue(ioPool, instance);
+			this.writeInt(ioPool, dest, instance, val);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size = getSize(ioPool, instance);
-			int val;
-			if(unsigned){
-				val = size.readInt(src);
-			}else{
-				val = size.readIntSigned(src);
-			}
+			int val = readInt(ioPool, src, instance);
 			setValue(ioPool, instance, val);
-		}
-		
-		@Override
-		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
-			var val = getValue(ioPool, instance);
-			if(val == 0) return Optional.empty();
-			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -427,19 +969,65 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FShort<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
+	public abstract static sealed class FShortBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
 		
-		private final boolean unsigned;
+		protected final boolean unsigned;
 		
-		private FShort(FieldAccessor<T> field, VaryingSize size){
+		protected FShortBase(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
 			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
 		}
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readIntConst(body, !unsigned);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readIntDyn(body, !unsigned);
+				}
+				body.cast(short.class);
+			});
+		}
+		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			var all = EnumSet.allOf(NumberSize.class);
 			all.removeIf(s -> s.greaterThan(SHORT));
 			return all;
+		}
+		
+		protected void writeShort(VarPool<T> ioPool, ContentWriter dest, T instance, short val) throws IOException{
+			var size = getSafeSize(ioPool, instance, unsigned, val);
+			if(unsigned){
+				size.writeInt(dest, val);
+			}else{
+				size.writeIntSigned(dest, val);
+			}
+		}
+		
+		protected short readShort(VarPool<T> ioPool, ContentReader src, T instance) throws IOException{
+			var size = getSize(ioPool, instance);
+			if(unsigned){
+				return (short)size.readInt(src);
+			}else{
+				return (short)size.readIntSigned(src);
+			}
+		}
+		
+		@Override
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null || val == 0) return Optional.empty();
+			return Optional.of(Doc.text(String.valueOf(val)));
+		}
+	}
+	
+	public static final class FShort<T extends IOInstance<T>> extends FShortBase<T>{
+		
+		private FShort(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
 		}
 		@Override
 		protected IOField<T, Short> withVaryingSize(VaryingSize size){
@@ -467,32 +1055,14 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var val  = getValue(ioPool, instance);
-			var size = getSafeSize(ioPool, instance, unsigned, val);
-			if(unsigned){
-				size.writeInt(dest, val);
-			}else{
-				size.writeIntSigned(dest, val);
-			}
+			var val = getValue(ioPool, instance);
+			writeShort(ioPool, dest, instance, val);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var   size = getSize(ioPool, instance);
-			short val;
-			if(unsigned){
-				val = (short)size.readInt(src);
-			}else{
-				val = (short)size.readIntSigned(src);
-			}
+			var val = readShort(ioPool, src, instance);
 			setValue(ioPool, instance, val);
-		}
-		
-		@Override
-		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
-			var val = getValue(ioPool, instance);
-			if(val == 0) return Optional.empty();
-			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -505,14 +1075,104 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
+	public static final class FShortBoxed<T extends IOInstance<T>> extends FShortBase<T>{
 		
-		private FByte(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FShortBoxed(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+		}
+		
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+			initStd(isNull);
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		protected IOField<T, Short> withVaryingSize(VaryingSize size){ return new FShortBoxed<>(getAccessor(), size); }
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val = get(ioPool, instance);
+			if(val == null){
+				if(nullable()){
+					var size = getSafeSize(ioPool, instance, VOID);
+					dest.writeWord(0, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			writeShort(ioPool, dest, instance, val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				getSafeSize(ioPool, instance, VOID).skip(src);
+				return;
+			}
+			var val = readShort(ioPool, src, instance);
+			set(ioPool, instance, val);
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
+		}
+	}
+	
+	public abstract static sealed class FByteBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
+		
+		protected FByteBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				body.get("src").call("readInt1");
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(BYTE);
 		}
+		
+		@Override
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null || val == 0) return Optional.empty();
+			return Optional.of(Doc.text(String.valueOf(val)));
+		}
+	}
+	
+	public static final class FByte<T extends IOInstance<T>> extends FByteBase<T>{
+		
+		private FByte(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
+		
 		@Override
 		protected IOField<T, Byte> withVaryingSize(VaryingSize size){
 			return new FByte<>(getAccessor(), size);
@@ -549,13 +1209,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
-			var val = getValue(ioPool, instance);
-			if(val == 0) return Optional.empty();
-			return Optional.of(Doc.text(String.valueOf(val)));
-		}
-		
-		@Override
 		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1) == getValue(ioPool2, inst2);
 		}
@@ -565,7 +1218,80 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean>{
+	public static final class FByteBoxed<T extends IOInstance<T>> extends FByteBase<T>{
+		
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FByteBoxed(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+		}
+		
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+			initStd(isNull);
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		protected IOField<T, Byte> withVaryingSize(VaryingSize size){ return new FByteBoxed<>(getAccessor(), size); }
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val = get(ioPool, instance);
+			if(val == null){
+				if(nullable()){
+					var size = getSafeSize(ioPool, instance, VOID);
+					dest.writeWord(0, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			dest.writeInt1(val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				getSafeSize(ioPool, instance, VOID).skip(src);
+				return;
+			}
+			var val = src.readInt1();
+			set(ioPool, instance, val);
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? 0 : Byte.hashCode(val);
+		}
+	}
+	
+	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator.OnBitSpace<T>{
+		@Override
+		public void injectWriteFieldToBits(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			accessMap.get(getAccessor(), body);
+			body.cast(long.class);
+		}
 		
 		private FBoolean(FieldAccessor<T> field){
 			super(field, SizeDescriptor.Fixed.of(BIT, 1));
@@ -620,11 +1346,141 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Boolean.hashCode(getValue(ioPool, instance));
 		}
+		
+		@Override
+		public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth{
+			accessMap.set(getAccessor(), body, e -> {
+				e.get(bitsFieldName).cast(boolean.class);
+			});
+		}
 	}
 	
-	private final   boolean                               forceFixed;
-	protected final VaryingSize                           maxSize;
-	private         BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
+	public static final class FBooleanBoxed<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator.OnBitSpace<T>{
+		@Override
+		public void injectWriteFieldToBits(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			accessMap.markTemporary();
+			var value = accessMap.temporaryLocalField(Boolean.class, "writeBoolean", body);
+			accessMap.getFieldRef(this, body);
+			body.call("get", args -> { args.get("ioPool"); accessMap.getObject(args); }).cast(Boolean.class).set(value);
+			if(nullable()){
+				body.get(value).ifIsNull(b -> b.val(2L)).elseRun(b -> b.get(value).unbox().cast(long.class));
+			}else{
+				body.get(value).unbox().cast(long.class);
+			}
+			accessMap.dropTemporary(body);
+		}
+		
+		private FBooleanBoxed(FieldAccessor<T> field){
+			super(field);
+		}
+		
+		@Override
+		public void init(FieldSet<T> ioFields){
+			super.init(ioFields);
+			initSizeDescriptor(SizeDescriptor.Fixed.of(BIT, nullable()? 2 : 1));
+		}
+		
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return Set.of(TypeFlag.PRIMITIVE_OR_ENUM);
+		}
+		
+		@Override
+		public void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
+			var v = get(ioPool, instance);
+			int bits, bitCount;
+			if(nullable()){
+				if(v == null){
+					bits = 0b10;
+				}else{
+					bits = v? 1 : 0;
+				}
+				bitCount = 2;
+			}else{
+				if(v == null){
+					throw new FieldIsNull(this);
+				}else{
+					bits = v? 1 : 0;
+				}
+				bitCount = 1;
+			}
+			dest.writeBits(bits, bitCount);
+		}
+		
+		@Override
+		public void readBits(VarPool<T> ioPool, BitReader src, T instance) throws IOException{
+			Boolean val;
+			if(nullable()){
+				var bits2 = (int)src.readBits(2);
+				val = switch(bits2){
+					case 0b00 -> false;
+					case 0b01 -> true;
+					case 0b10 -> null;
+					default -> fail(bits2);
+				};
+			}else{
+				val = src.readBoolBit();
+			}
+			set(ioPool, instance, val);
+		}
+		private Boolean fail(int bits2) throws IOException{
+			if(bits2 == 0b11){
+				throw new MalformedObject(this + " got a null true value. This is illegal and could point to a corrupted file");
+			}
+			throw new ShouldNeverHappenError(bits2 + "");
+		}
+		@Override
+		public void skipReadBits(BitReader src, T instance) throws IOException{
+			src.skip(nullable()? 2 : 1);
+		}
+		
+		@Override
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			return Optional.of(Doc.text(String.valueOf(get(ioPool, instance))));
+		}
+		
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return get(ioPool1, inst1) == get(ioPool2, inst2);
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? 0 : val? 2 : 1;
+		}
+		
+		@Override
+		public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth{
+			
+			accessMap.set(getAccessor(), body, base -> {
+				if(nullable()){
+					base.get(bitsFieldName)
+					    .val(3)
+					    .ifEquality(b -> {
+						    b.throwNew(IOException.class, "Boolean field got a null true value. This is illegal and could point to a corrupted file");
+					    })
+					    .get(bitsFieldName)
+					    .val(2)
+					    .ifEquality(b -> b.nullVal(Boolean.class))
+					    .elseRun(b -> {
+						    b.get(bitsFieldName)
+						     .cast(boolean.class).box();
+					    });
+				}else{
+					base.get(bitsFieldName)
+					    .cast(boolean.class).box();
+				}
+			});
+			
+			
+		}
+	}
+	
+	private final   boolean          forceFixed;
+	protected final VaryingSize      maxSize;
+	private         DynamicFieldSize dynamicSize;
+	
+	protected StandardOps std;
 	
 	protected IOFieldPrimitive(FieldAccessor<T> field, VaryingSize maxSize){
 		super(field);
@@ -636,6 +1492,28 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		this.maxSize = maxSize != null? maxSize : new VaryingSize(maxAllowed, -1);
 	}
 	
+	protected final class DynamicFieldSize implements BiFunction<VarPool<T>, T, NumberSize>{
+		protected final IOField<T, NumberSize> field;
+		private final   EnumSet<NumberSize>    allowed;
+		private DynamicFieldSize(IOField<T, NumberSize> field, EnumSet<NumberSize> allowed){
+			this.field = field;
+			this.allowed = allowed;
+		}
+		@Override
+		public NumberSize apply(VarPool<T> ioPool, T instance){
+			var val = field.get(ioPool, instance);
+			if(!allowed.contains(val)) failSize(val);
+			return val;
+		}
+		private void failSize(NumberSize val){
+			throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + IOFieldPrimitive.this + " with dynamic size " + field);
+		}
+	}
+	
+	protected DynamicFieldSize getDynamicSize(){
+		return dynamicSize;
+	}
+	
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
@@ -643,12 +1521,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		if(!forceFixed && IOFieldTools.getDynamicSize(getAccessor()) instanceof Some(var field)){
 			var allowed = allowedSizes();
 			allowed.removeIf(s -> s.greaterThan(maxSize.size));
-			dynamicSize = (ioPool, instance) -> {
-				var val = field.get(ioPool, instance);
-				if(!allowed.contains(val))
-					throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + this + " with dynamic size " + field);
-				return val;
-			};
+			dynamicSize = new DynamicFieldSize(field, allowed);
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				Iters.from(allowed).min().orElse(VOID),
 				Iters.from(allowed).max().opt(),
@@ -662,6 +1535,100 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size = getSize(ioPool, instance);
 		size.skip(src);
+	}
+	
+	@Override
+	public final void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
+		std.readField(body, accessMap);
+	}
+
+	/** The generated writer uses the same size guard as the interpreted writer. */
+	public final NumberSize generatedWriteSize(VarPool<T> ioPool, T instance, NumberSize needed){
+		return getSafeSize(ioPool, instance, needed);
+	}
+	public final NumberSize generatedSize(VarPool<T> ioPool, T instance){
+		return getSize(ioPool, instance);
+	}
+	@Override
+	public final void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.call(CodeUtils.class, "primitive_size", args -> {
+			accessMap.getFieldRef(this, args);
+			args.get("ioPool"); accessMap.getObject(args);
+		}).call("skip", args -> args.get("src"));
+	}
+
+	private void injectWriteSize(CodeBlock body, AccessMap accessMap, CodeArg needed) throws MalformedJorth{
+		body.call(CodeUtils.class, "primitive_writeSize", args -> {
+			accessMap.getFieldRef(this, args);
+			args.get("ioPool");
+			accessMap.getObject(args);
+			needed.accept(args);
+		});
+	}
+
+	@Override
+	public final void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.markTemporary();
+		var value = accessMap.temporaryLocalField(getType(), "writeValue", body);
+		if(getType().isPrimitive()){
+			accessMap.get(getAccessor(), body);
+		}else{
+			// Field.get also supplies DEFAULT_IF_NULL values and the normal null diagnostics.
+			accessMap.getFieldRef(this, body);
+			body.call("get", args -> { args.get("ioPool"); accessMap.getObject(args); }).cast(getType());
+		}
+		body.set(value);
+		if(getType().isPrimitive()){
+			injectWriteValue(body, accessMap, value, false);
+		}else{
+			body.get(value).ifIsNull(b -> {
+				if(!nullable()){
+					b.throwNew(FieldIsNull.class, args -> accessMap.getFieldRef(this, args));
+				}else{
+					b.get("dest").val(0L);
+					injectWriteSize(b, accessMap, args -> args.get(NumberSize.class, "VOID"));
+					b.get(NumberSize.class, "bytes").call("writeWord", 2);
+				}
+			}).elseRun(b -> injectWriteValue(b, accessMap, value, true));
+		}
+		accessMap.dropTemporary(body);
+	}
+
+	private void injectWriteValue(CodeBlock body, AccessMap accessMap, String value, boolean boxed) throws MalformedJorth{
+		var primitive = SupportedPrimitive.get(getType()).orElseThrow();
+		CodeArg getValue = args -> { args.get(value); if(boxed) args.unbox(); };
+		if(primitive == SupportedPrimitive.BYTE){
+			if(!boxed){
+				injectWriteSize(body, accessMap, args -> args.get(NumberSize.class, "BYTE"));
+				body.pop();
+			}
+			body.get("dest").call("writeInt1", args -> { getValue.accept(args); args.cast(int.class); });
+			return;
+		}
+		boolean unsigned = switch(this){
+			case FLongBase<?> f -> f.unsigned;
+			case FIntBase<?> f -> f.unsigned;
+			case FShortBase<?> f -> f.unsigned;
+			case FCharBase<?> ignored -> true;
+			default -> false;
+		};
+		injectWriteSize(body, accessMap, args -> {
+			if(primitive == SupportedPrimitive.FLOAT || primitive == SupportedPrimitive.DOUBLE){
+				args.get(NumberSize.class, boxed? "VOID" : primitive == SupportedPrimitive.FLOAT? "INT" : "LONG");
+			}else{
+				args.call(NumberSize.class, "bySize", a -> { getValue.accept(a); a.cast(long.class).val(unsigned); });
+			}
+		});
+		var method = switch(primitive){
+			case DOUBLE -> "writeDouble";
+			case FLOAT -> "writeFloat";
+			case LONG -> unsigned? "write" : "writeSigned";
+			default -> unsigned? "writeInt" : "writeIntSigned";
+		};
+		body.call(method, args -> {
+			args.get("dest"); getValue.accept(args);
+			if(primitive != SupportedPrimitive.FLOAT && primitive != SupportedPrimitive.DOUBLE && primitive != SupportedPrimitive.LONG) args.cast(int.class);
+		});
 	}
 	
 	protected abstract EnumSet<NumberSize> allowedSizes();

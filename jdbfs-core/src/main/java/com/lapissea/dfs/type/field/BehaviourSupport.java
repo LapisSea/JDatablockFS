@@ -7,7 +7,6 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.field.IOField.FieldUsage.BehaviourRes;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -20,7 +19,6 @@ import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
-import java.lang.reflect.Type;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -61,16 +59,6 @@ public final class BehaviourSupport{
 		));
 	}
 	
-	private static <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
-		if(field.hasAnnotation(IOValue.Reference.class)) return false;
-		var typ = field.getType();
-		if(typ.isArray() || UtilL.instanceOf(typ, Collection.class) || UtilL.instanceOf(typ, Type.class)) return true;
-		if(IOInstance.isInstance(typ)){
-			return IOInstance.isManaged(typ);
-		}
-		return IOFieldTools.isGeneric(field) || Iters.from(FieldCompiler.getWrapperTypes()).anyMatch(c -> UtilL.instanceOf(typ, c));
-	}
-	
 	public static <T extends IOInstance<T>> BehaviourRes<T> ioNullability(FieldAccessor<T> field, IONullability ann){
 		if(SupportedPrimitive.get(field.getType()).isPresent() && ann.value() == DEFAULT_IF_NULL){
 			throw new MalformedStruct("fmt", "Wrapper type on {}#yellow does not support {}#red mode", field, DEFAULT_IF_NULL);
@@ -78,10 +66,6 @@ public final class BehaviourSupport{
 		
 		if(!IOFieldTools.isNullable(field)){
 			return BehaviourRes.non();
-		}
-		
-		if(!canHaveNullabilityField(field)){
-			throw new ShouldNeverHappenError();//TODO: remove this when fully tested
 		}
 		
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Boolean>(

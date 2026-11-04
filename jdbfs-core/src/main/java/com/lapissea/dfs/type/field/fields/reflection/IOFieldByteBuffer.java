@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
@@ -11,6 +12,7 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
@@ -18,6 +20,8 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,7 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public final class IOFieldByteBuffer<T extends IOInstance<T>> extends NullFlagCompanyField<T, ByteBuffer>{
+public final class IOFieldByteBuffer<T extends IOInstance<T>> extends NullFlagCompanyField<T, ByteBuffer> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<ByteBuffer>{
@@ -37,18 +41,9 @@ public final class IOFieldByteBuffer<T extends IOInstance<T>> extends NullFlagCo
 		
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
-			return List.of(
-				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
-				Behaviour.of(IOValue.class, field -> {
-					return new BehaviourRes<T>(new VirtualFieldDefinition<>(
-						StoragePool.IO,
-						FieldNames.modifiable(field),
-						boolean.class
-					));
-				}),
-				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
-				Behaviour.of(IOCompression.class, BehaviourSupport::packCompanion)
-			);
+			return List.of(Behaviour.of(IOValue.class, BehaviourSupport::collectionLength), Behaviour.of(IOValue.class, field -> {
+				return new BehaviourRes<T>(new VirtualFieldDefinition<>(StoragePool.IO, FieldNames.modifiable(field), boolean.class));
+			}), Behaviour.of(IONullability.class, BehaviourSupport::ioNullability), Behaviour.of(IOCompression.class, BehaviourSupport::packCompanion));
 		}
 	}
 	
@@ -167,5 +162,40 @@ public final class IOFieldByteBuffer<T extends IOInstance<T>> extends NullFlagCo
 		}
 		int size = arraySize.getValue(ioPool, instance);
 		src.skipExact(size);
+	}
+	
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		if(compression != null){
+			var res = accessMap.temporaryLocalField(ByteBuffer.class, "unpackedBuffer", body);
+			
+			body.call(ByteBuffer.class, "wrap", args -> {
+				args.get(IOCompression.Type.class, compression.name())
+				    .call("unpack", data -> accessMap.get(compressed, data));
+			}).set(res);
+			
+			accessMap.get(modifiable, body);
+			body.ifFalse(b -> b.get(res).call("asReadOnlyBuffer").set(res));
+			accessMap.set(getAccessor(), body, b -> b.get(res));
+			return;
+		}
+		var res = accessMap.temporaryLocalField(ByteBuffer.class, "bbRes", body);
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			bod.call(ByteBuffer.class, "wrap", bbArg -> {
+				bbArg.get("src").call("readFully", readArg -> {
+					readArg.newObj(byte[].class, arg -> {
+						accessMap.get(arraySize, arg);
+					});
+				});
+			});
+			bod.set(res);
+			
+			accessMap.get(modifiable, bod);
+			bod.ifFalse(b -> {
+				b.get(res).call("asReadOnlyBuffer").set(res);
+			});
+			
+			bod.get(res);
+		});
 	}
 }

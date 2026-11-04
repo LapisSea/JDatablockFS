@@ -22,6 +22,10 @@ public interface FieldInfo{
 			return field.isEnumConstant();
 		}
 		@Override
+		public Visibility visibility(){
+			return Visibility.ofModifiers(field.getModifiers());
+		}
+		@Override
 		public boolean isStatic(){
 			return Modifier.isStatic(field.getModifiers());
 		}
@@ -45,6 +49,7 @@ public interface FieldInfo{
 	
 	boolean isEnumConstant();
 	boolean isStatic();
+	Visibility visibility();
 	ClassName owner();
 	JType type();
 	String name();

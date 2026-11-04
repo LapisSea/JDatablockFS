@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
@@ -12,17 +13,20 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, byte[]>{
+public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, byte[]> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<byte[]>{
@@ -142,6 +146,37 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 			src.readFully(data);
 		}
 		set(ioPool, instance, data);
+	}
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		if(compression != null) return;
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(arraySize, args);
+			args.cast(long.class);
+		});
+	}
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		if(compression != null){
+			var unpackedBytes = accessMap.temporaryLocalField(byte[].class, "unpackedBytes", body);
+			
+			body.tryRun(bod -> {
+				    bod.get(IOCompression.Type.class, compression.name())
+				       .call("unpack", args -> accessMap.get(compressed, args))
+				       .set(unpackedBytes);
+			    })
+			    .tryCatch(IOException.class, b -> {
+				    b.throwNew(IOException.class, this + " has invalid data");
+			    });
+			
+			accessMap.set(getAccessor(), body, b -> b.get(unpackedBytes));
+			return;
+		}
+		
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			bod.get("src")
+			   .call("readInts1", e -> accessMap.get(arraySize, e));
+		});
 	}
 	
 	@Override

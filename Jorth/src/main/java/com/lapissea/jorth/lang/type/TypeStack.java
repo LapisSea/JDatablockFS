@@ -17,6 +17,10 @@ public class TypeStack{
 		this.parent = parent;
 	}
 	
+	public TypeStack getParent(){
+		return parent;
+	}
+	
 	@Override
 	public String toString(){
 		return totalStack().map(GenericType::toString).collect(Collectors.joining(", ", "[", "]"));
@@ -32,6 +36,9 @@ public class TypeStack{
 	}
 	public GenericType pop() throws MalformedJorth{
 		requireElements(1);
+		if(stack.isEmpty()){
+			throw new MalformedJorth("can not pop values outside the code path");
+		}
 		return stack.removeLast();
 	}
 	
@@ -43,20 +50,56 @@ public class TypeStack{
 	
 	public int size(){
 		if(parent == null) return stack.size();
-		return parent.size() + stack.size();
+		return stack.size() + parent.size();
 	}
 	
 	public void requireElements(int count) throws MalformedJorth{
 		if(stack.size()>=count) return;
+		if(totalStack().count()>=count) return;
 		throw new MalformedJorth("Required at least " + count + " " + TextUtil.plural("element", count) + " on the stack");
 	}
-	
-	public GenericType peek(int pos){
+	public GenericType peekLast() throws MalformedJorth{
+		requireElements(1);
+		if(stack.isEmpty()){
+			return parent.peekLast();
+		}
+		return stack.getLast();
+	}
+	public GenericType peek(int pos) throws MalformedJorth{
+		if(pos<0 || pos>=size()){
+			throw new MalformedJorth("peek position " + pos + " is out of bounds for the stack of size " + size());
+		}
 		if(parent == null){
 			return stack.get(pos);
 		}
 		int localPos = pos - parent.size();
 		if(localPos<0) return parent.peek(pos);
 		return stack.get(localPos);
+	}
+	
+	public List<GenericType> getLocalPortion(){
+		return stack;
+	}
+	
+	/**
+	 * Copies all inherited and local entries into an independent stack with no parent.
+	 */
+	public TypeStack copyFlat(){
+		var copy = new TypeStack(null);
+		totalStack().forEach(copy::push);
+		return copy;
+	}
+	
+	@Override
+	public TypeStack clone(){
+		var stack = new TypeStack(parent);
+		stack.stack.addAll(this.stack);
+		return stack;
+	}
+	
+	@Override
+	public boolean equals(Object obj){
+		return obj instanceof TypeStack other &&
+		       totalStack().toList().equals(other.totalStack().toList());
 	}
 }

@@ -9,23 +9,6 @@ import java.util.Optional;
 
 public interface TypeSource{
 	
-	class Of2 implements TypeSource{
-		private final TypeSource a;
-		private final TypeSource b;
-		
-		public Of2(TypeSource a, TypeSource b){
-			this.a = a;
-			this.b = b;
-		}
-		
-		@Override
-		public Optional<ClassInfo> maybeByType(GenericType type){
-			var result = a.maybeByType(type);
-			if(result.isPresent()) return result;
-			return b.maybeByType(type);
-		}
-	}
-	
 	class OfClassLoader implements TypeSource{
 		private final TypeSource  parent;
 		private final ClassLoader classLoader;
@@ -43,7 +26,7 @@ public interface TypeSource{
 				var res = parent.maybeByType(type);
 				if(res.isPresent()) return res;
 			}
-			var name   = type.raw().dotted();
+			var name   = type.jvmDescriptorStr();
 			var cached = cache.get(name);
 			if(cached != null) return cached;
 			
@@ -81,13 +64,31 @@ public interface TypeSource{
 		return new OfClassLoader(parent, classLoader);
 	}
 	
+	static TypeSource ofNestmate(TypeSource parent, Class<?> definitionHost){
+		return new OfClassLoader(parent, definitionHost.getClassLoader()){
+			@Override
+			public boolean areNestmates(ClassName caller, ClassName owner){
+				var callerName    = caller.dotted();
+				var callerPackage = callerName.substring(0, Math.max(0, callerName.lastIndexOf('.')));
+				if(!callerPackage.equals(definitionHost.getPackageName())) return false;
+				try{
+					return definitionHost.isNestmateOf(Class.forName(owner.dotted(), false, definitionHost.getClassLoader()));
+				}catch(ClassNotFoundException e){
+					return false;
+				}
+			}
+		};
+	}
+	
+	default boolean areNestmates(ClassName caller, ClassName owner){ return false; }
+	
 	Optional<ClassInfo> maybeByType(GenericType type);
 	
 	default Optional<ClassInfo> maybeByName(ClassName name){
-		return maybeByType(new GenericType(name));
+		return maybeByType(GenericType.of(name));
 	}
 	default ClassInfo byName(ClassName name) throws MalformedJorth{
-		return byType(new GenericType(name));
+		return byType(GenericType.of(name));
 	}
 	default ClassInfo byType(GenericType type) throws MalformedJorth{
 		if(!type.args().isEmpty()) type = type.withoutArgs();

@@ -17,7 +17,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Map;
 
-public class FunctionalVarHandleAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
+public class FunctionalVarHandleAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp> implements FieldAccessor.FieldOrMethod{
 	
 	private final Type     genericType;
 	private final Class<?> rawType;
@@ -26,6 +26,9 @@ public class FunctionalVarHandleAccessor<CTyp extends IOInstance<CTyp>> extends 
 	
 	private final MethodHandle getter;
 	private final MethodHandle setter;
+	
+	private final String getterName;
+	private final String setterName;
 	
 	public FunctionalVarHandleAccessor(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations,
 	                                   Method getter, Match<Method> setter, String name, Type genericType) throws IllegalAccessException{
@@ -58,6 +61,18 @@ public class FunctionalVarHandleAccessor<CTyp extends IOInstance<CTyp>> extends 
 			default -> null;
 		};
 		
+		getterName = getter.getName();
+		setterName = setter.map(Method::getName).orElse(null);
+	}
+	
+	@Override
+	public AccessType getter(){
+		return new AccessType.Method(getterName);
+	}
+	@Override
+	public AccessType setter(){
+		if(setterName == null) throw new UnsupportedOperationException("There is no setter for " + this);
+		return new AccessType.Method(setterName);
 	}
 	
 	@Override

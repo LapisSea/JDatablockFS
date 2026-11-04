@@ -3,6 +3,7 @@ package com.lapissea.dfs.type;
 import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.SyntheticWildcardType;
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.def.TypeDef;
@@ -56,6 +57,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		List<IOType> getArgs();
 	}
 	
+	@StructPipe.Special
 	public static final class TypeRaw extends IOType implements RawAndArg{
 		
 		private static final char                  PRIMITIVE_MARKER = ';';

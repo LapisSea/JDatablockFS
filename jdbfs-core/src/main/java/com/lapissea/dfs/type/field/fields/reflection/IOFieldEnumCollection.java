@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.bit.EnumUniverse;
@@ -17,11 +17,17 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.type.GenericType;
 
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
@@ -31,7 +37,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 
-public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum<E>, ColType> extends NullFlagCompanyField<T, ColType>{
+public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum<E>, ColType> extends NullFlagCompanyField<T, ColType> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageList implements FieldUsage{
@@ -154,11 +160,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		if(nullable() && getIsNull(ioPool, instance)) enums = null;
 		else{
 			int size = collectionLength.getValue(ioPool, instance);
-			E[] tmp;
-			try(var s = new BitInputStream(src, (long)universe.bitSize*size)){
-				tmp = s.readEnums(universe, size);
-			}
-			enums = adapter.asCollection(tmp);
+			enums = adapter.asCollection(universe.read(size, src));
 		}
 		set(ioPool, instance, enums);
 	}
@@ -169,6 +171,48 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		src.skipExact(byteCount(size));
 	}
 	
+	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		injectWriteFieldNullable(body, accessMap, null, writer -> {
+			var value = accessMap.temporaryLocalField(getType(), "enumCollection", writer);
+			writer.set(value);
+			accessMap.getConstant(universe, EnumUniverse.class, writer);
+			writer.call("write", args -> {
+				accessMap.getConstant(adapter, CollectionAdapter.class, args);
+				args.call("asListView", collection -> collection.get(value))
+				    .cast(GenericType.of(List.class).withArgs(universe.type)).get("dest");
+			});
+		});
+	}
+
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(collectionLength, args);
+			args.cast(long.class).mul(universe.bitSize).add(7).bitShiftRight(true, 3);
+		});
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			CodeArg readArray = args -> {
+				accessMap.getConstant(universe, EnumUniverse.class, args);
+				args.call("read", read -> {
+					accessMap.get(collectionLength, read);
+					read.get("src");
+				});
+			};
+			if(getType().isArray()){
+				readArray.accept(bod);
+			}else{
+				accessMap.getConstant(adapter, CollectionAdapter.class, bod);
+				bod.call("asCollection", readArray);
+			}
+			bod.cast(getType());
+		});
+	}
+
 	private int byteCount(int len){
 		return BitUtils.bitsToBytes(universe.bitSize*len);
 	}

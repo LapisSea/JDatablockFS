@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -9,6 +10,7 @@ import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -18,11 +20,15 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.Doc;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,7 +40,112 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
-	private static final class GeneralMerger<T extends IOInstance<T>> extends BitFieldMerger<T>{
+	private static final class GeneralMerger<T extends IOInstance<T>> extends BitFieldMerger<T> implements SpecializedGenerator{
+		
+		private record ReadPlan(List<ReadStep> steps, int initialBytes, int windowBits, int offset){ }
+		
+		private sealed interface ReadStep{
+			record Read(OnBitSpace<?> generator, int bits, int offset) implements ReadStep{ }
+			
+			record AppendBytes(int bytes) implements ReadStep{ }
+		}
+		
+		@Override
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+			if(safetyBits.isEmpty()){
+				throw new UnsupportedCodeGenType("Dynamic merged bits field");
+			}
+			
+			ReadPlan plan = computePlan();
+			
+			var rawBits = accessMap.temporaryLocalField(long.class, "rawBits", body);
+			var field   = accessMap.temporaryLocalField(int.class, "fieldPortion", body);
+			
+			body.get("src")
+			    .call("readWord", List.of(plan.initialBytes()))
+			    .set(rawBits);
+			
+			for(var step : plan.steps()){
+				switch(step){
+					case ReadStep.AppendBytes(var bytes) -> {
+						body.get(rawBits).bitShiftRight(true, Integer.SIZE)
+						    .get("src").call("readWord", List.of(bytes))
+						    .bitShiftLeft(Integer.SIZE)
+						    .bitOr()
+						    .set(rawBits);
+					}
+					case ReadStep.Read(var generator, var bits, var offset) -> {
+						body.get(rawBits);
+						if(offset>0){
+							body.bitShiftRight(true, offset);
+						}
+						body.cast(int.class)
+						    .bitAnd(BitUtils.makeMask(bits))
+						    .set(field);
+						
+						accessMap.markTemporary();
+						try{
+							generator.injectReadFieldFromBits(body, accessMap, field);
+						}finally{
+							accessMap.dropTemporary(body);
+						}
+					}
+				}
+			}
+			
+			if(plan.windowBits()>plan.offset()){
+				body.get(rawBits);
+				CodeUtils.validateOneBits(body, plan.windowBits()/Byte.SIZE, plan.offset());
+			}
+		}
+		
+		private ReadPlan computePlan() throws UnsupportedCodeGenType{
+			var plan = new ArrayList<ReadStep>(group.size());
+			
+			long bytes        = getSizeDescriptor().requireFixed(WordSpace.BYTE);
+			int  initialBytes = (int)Math.min(Long.BYTES, bytes);
+			
+			long remainingBytes = bytes - initialBytes;
+			int  windowBits     = initialBytes*Byte.SIZE;
+			int  offset         = 0;
+			
+			for(var fi : group){
+				var sizeO = fi.getSizeDescriptor().getFixed(WordSpace.BIT);
+				if(sizeO.isEmpty()){
+					throw new UnsupportedCodeGenType(Log.fmt("Field {}#red has dynamic size", fi));
+				}
+				long size = sizeO.getAsLong();
+				if(size<0 || size>31){
+					throw new UnsupportedCodeGenType(Log.fmt("Field {}#red larger than 4 bytes", fi));
+				}
+				
+				if(!(fi instanceof OnBitSpace<?> generator)){
+					throw new UnsupportedCodeGenType(Log.fmt("Field {}#red does not support code generation", fi));
+				}
+				
+				int bits = (int)size;
+				if(offset + bits>windowBits){
+					if(offset<Integer.SIZE || remainingBytes == 0){
+						throw new UnsupportedCodeGenType("Bits field cannot fit a rolling window: " + fi);
+					}
+					
+					int appendBytes = (int)Math.min(Integer.BYTES, remainingBytes);
+					remainingBytes -= appendBytes;
+					offset -= Integer.SIZE;
+					windowBits = Integer.SIZE + appendBytes*Byte.SIZE;
+					if(offset + bits>windowBits){
+						throw new UnsupportedCodeGenType("Bits field exceeds appended window: " + fi);
+					}
+					plan.add(new ReadStep.AppendBytes(appendBytes));
+				}
+				
+				plan.add(new ReadStep.Read(generator, bits, offset));
+				offset += bits;
+			}
+			
+			return new ReadPlan(plan, initialBytes, windowBits, offset);
+		}
+		
 		private GeneralMerger(List<BitField<T, ?>> group){
 			super(group);
 		}
@@ -123,11 +234,41 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		
 	}
 	
-	private static final class SimpleMerger<T extends IOInstance<T>> extends BitFieldMerger<T>{
+	private static final class SimpleMerger<T extends IOInstance<T>> extends BitFieldMerger<T> implements SpecializedGenerator{
+		@Override
+		public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			body.get("src").call("skipExact", args -> args.val(bytes));
+		}
+		@Override
+		public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+			accessMap.markTemporary();
+			var raw = accessMap.temporaryLocalField(long.class, "writeMergedBits", body);
+			body.set(raw, 0L);
+			int offset = 0;
+			for(var field : group){
+				if(!(field instanceof SpecializedGenerator.OnBitSpace<?> generator)){
+					throw new UnsupportedCodeGenType("Unsupported merged bit writer: " + field);
+				}
+				body.get(raw);
+				generator.injectWriteFieldToBits(body, accessMap);
+				if(offset != 0) body.bitShiftLeft(offset);
+				body.bitOr().set(raw);
+				offset += Math.toIntExact(field.getSizeDescriptor().requireFixed(WordSpace.BIT));
+			}
+			body.get("dest").get(raw);
+			if(oneBits>1){
+				int usedBits = offset;
+				body.call(CodeUtils.class, "writeIntegrityBits", args -> args.get(raw).val(oneBits).val(usedBits)).bitOr();
+			}else if(oneBits == 1){
+				body.val(1L<<offset).bitOr();
+			}
+			body.val(numSize.bytes).call("writeWord", 2);
+			accessMap.dropTemporary(body);
+		}
+		
 		private final long       bytes;
 		private final int        oneBits;
 		private final NumberSize numSize;
-		
 		
 		private SimpleMerger(List<BitField<T, ?>> group, NumberSize numSize){
 			super(group);
@@ -169,6 +310,55 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		@Override
 		public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			src.skipExact(bytes);
+		}
+		@Override
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+			var rawBits = accessMap.temporaryLocalField(long.class, "rawBits", body);
+			
+			int totalBits = 0;
+			for(var fi : group){
+				if(!(fi instanceof SpecializedGenerator.OnBitSpace<?>)){
+					throw new UnsupportedOperationException("Can not generate merged field because a field is not supported:\n  " + fi);
+				}
+				totalBits += Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
+			}
+			
+			CodeUtils.readBytesFromSrc(body, numSize);
+			if(numSize.bits() != totalBits){
+				var tb = totalBits;
+				body.call(CodeUtils.class, "readIntegrityBits", args -> args.dup().val(numSize.bits()).val(tb));
+			}
+			
+			body.set(rawBits);
+			
+			var field = accessMap.temporaryLocalField(int.class, "fieldPortion", body);
+			
+			int bitOffset = 0;
+			
+			for(var fi : group){
+				int bits = Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
+				if(bits>31){
+					throw new UnsupportedCodeGenType("Long bits field");
+				}
+				var mask = BitUtils.makeMask(bits);
+				
+				body.get(rawBits);
+				if(bitOffset>0){
+					body.bitShiftRight(true, bitOffset);
+				}
+				body.cast(int.class)
+				    .bitAnd(mask)
+				    .set(field);
+				
+				bitOffset += bits;
+				
+				accessMap.markTemporary();
+				try{
+					((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(body, accessMap, field);
+				}finally{
+					accessMap.dropTemporary(body);
+				}
+			}
 		}
 	}
 	

@@ -9,15 +9,7 @@ import com.lapissea.dfs.objects.text.Encoding;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.field.Annotations;
-import com.lapissea.dfs.type.field.BehaviourSupport;
-import com.lapissea.dfs.type.field.FieldNames;
-import com.lapissea.dfs.type.field.FieldSet;
-import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.type.field.StoragePool;
-import com.lapissea.dfs.type.field.VirtualFieldDefinition;
+import com.lapissea.dfs.type.field.*;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -25,6 +17,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.nio.CharBuffer;
@@ -34,7 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOField<CTyp, String>{
+public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOField<CTyp, String> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<String>{
@@ -188,5 +182,29 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 		var val = get(ioPool, instance);
 		if(val == null || val.length() == 0) return Optional.empty();
 		return Optional.of(Doc.text('"' + val + '"'));
+	}
+	
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		var cb = accessMap.temporaryLocalField(CharBuffer.class, "charBuffer", body);
+		
+		accessMap.set(getAccessor(), body, b -> {
+			b.call(CharBuffer.class, "allocate", args -> accessMap.get(charCountField, args))
+			 .set(cb);
+			
+			accessMap.get(encodingField, b);
+			b.call("read", args -> {
+				args.newObj(LimitedContentReader.class, a -> {
+					a.get("src");
+					accessMap.get(bytesField, a);
+					a.cast(long.class);
+				});
+				args.get(cb);
+			});
+			
+			b.get(cb)
+			 .call("flip")
+			 .call("toString");
+		});
 	}
 }

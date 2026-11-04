@@ -22,9 +22,9 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.StoragePool;
-import com.lapissea.dfs.type.field.access.VirtualAccessor;
-import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
-import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
+import com.lapissea.dfs.type.field.VirtualAccessor;
+import com.lapissea.dfs.type.field.VirtualAccessor.TypeOff.Primitive;
+import com.lapissea.dfs.type.field.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.Doc;
@@ -46,6 +46,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -367,6 +368,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private Map<FieldSet<T>, Struct<T>> partialCache;
 	
 	private Struct<ProxyBuilder<T>> builderObjType;
+	private Constructor<T>          argsCtorCache;
 	
 	private int hash = -1;
 	
@@ -377,6 +379,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		init(syncStage, runStage -> {
 			switch(runStage){
 				case STATE_CONCRETE_TYPE -> {
+					if(DEBUG_VALIDATION){
+						debugStart();
+					}
 					calcHash();
 					
 					var idef = isDefinition = IOInstance.Def.isDefinition(type);
@@ -407,11 +412,22 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					
 					if(canHaveDefaultConstructor()){
 						findEmptyConstructor(false);
+						
+						if(needsBuilderObj){
+							validateToBuildObj();
+						}
 					}
 				}
 				default -> throw new NotImplementedException();
 			}
 		}, null);
+	}
+	
+	private void debugStart(){
+		if(getType().getAnnotation(StructPipe.Special.class) instanceof StructPipe.Special special){
+			var delay = special.debugStructDelay();
+			if(delay>0) UtilL.sleep(delay);
+		}
 	}
 	
 	
@@ -544,7 +560,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var msg = e.getLocalizedMessage();
 			sj.add("INVALID: " + (msg == null? e.getClass().getSimpleName() : msg));
 		}
-		var state = getEstimatedState();
+		var state = getInitializationState();
 		if(state != STATE_DONE){
 			if(e == null) sj.add("init-state: " + stateToString(state));
 		}
@@ -1021,10 +1037,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public Struct<ProxyBuilder<T>> getBuilderObjType(boolean now){
 		var typ = builderObjType;
 		if(typ == null) typ = createBuilderObjType(now);
+		argsCtorCache = null;
 		return typ;
 	}
 	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
 		if(!needsBuilderObj()) throw new UnsupportedOperationException();
+		validateToBuildObj();
 		Class<ProxyBuilder<T>> cls;
 		try{
 			cls = BuilderProxyCompiler.getProxy(this);
@@ -1042,6 +1060,20 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		return builderObjType = typ;
+	}
+	
+	private void validateToBuildObj(){
+		var types = getRealFields()
+			            .mapped(IOField::getType)
+			            .toArray(Class[]::new);
+		try{
+			getConcreteType().getConstructor(types);
+		}catch(NoSuchMethodException e){
+			throw new MalformedStruct(
+				"fmt", e,
+				"Type {}#red contains read only fields but has no constructor containing all fields.\n" +
+				"  Required fields: {}#red", getConcreteType().getTypeName(), fields.mapped(e1 -> e1.getType().getTypeName()).joinAsStr(", "));
+		}
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
@@ -1069,5 +1101,70 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		var names = Iters.from(f).toSet(IOField::getName);
 		var impl  = IOInstance.Def.partialImplementation(typ, names);
 		return Struct.of(impl);
+	}
+	
+	T immutableDeepClone(T toCopy){
+		builderCopy:
+		{
+			var builderTyp = builderObjType;
+			if(builderTyp == null) break builderCopy;
+			return builderClone(toCopy, builderTyp);
+		}
+		return reflectionClone(toCopy);
+	}
+	
+	private T reflectionClone(T toCopy){
+		FieldSet<T> fields = getRealFields();
+		Object[]    values = new Object[fields.size()];
+		for(int i = 0; i<fields.size(); i++){
+			IOField<T, ?> field  = fields.get(i);
+			var           copied = makeCopyValue(toCopy, field);
+			values[i] = copied;
+		}
+		var types = getRealFields().mapped(IOField::getType).toArray(Class[]::new);
+		try{
+			var ctor = argsCtorCache == null? argsCtorCache = getType().getConstructor(types) : argsCtorCache;
+			return ctor.newInstance(values);
+		}catch(Throwable e){
+			Log.warn("Failed to do reflection based clone for {}#red. Trying builder clone...", this);
+			return builderClone(toCopy, getBuilderObjType(false));
+		}
+	}
+	private static <T extends IOInstance<T>> T builderClone(T toCopy, Struct<ProxyBuilder<T>> builderTyp){
+		var builder = builderTyp.make();
+		builder.copyFrom(toCopy);
+		builder = builder.clone();//deep clone fields
+		return builder.build();
+	}
+	
+	@SuppressWarnings("unchecked")
+	static <T extends IOInstance<T>, V> V makeCopyValue(T toCopyFrom, IOField<T, V> field){
+		
+		var acc = field.getAccessor();
+		var typ = acc.getType();
+		if(typ.isArray()){
+			var arrField = (IOField<T, Object[]>)field;
+			
+			var arr = arrField.get(null, toCopyFrom);
+			if(arr == null || arr.length == 0) return (V)arr;
+			
+			arr = arr.clone();
+			
+			if(IOInstance.isInstance(typ.componentType())){
+				var iArr = (IOInstance<?>[])arr;
+				for(int i = 0; i<iArr.length; i++){
+					var el = iArr[i];
+					iArr[i] = el.clone();
+				}
+			}
+			return (V)arr;
+		}
+		var oVal = field.get(null, toCopyFrom);
+		if(oVal == null) return null;
+		
+		if(!IOInstance.isInstance(typ)) return oVal;
+		if(IOInstance.isUnmanaged(typ)) return oVal;
+		var val = (IOInstance<?>)oVal;
+		return (V)val.clone();
 	}
 }

@@ -1,0 +1,1317 @@
+package com.lapissea.jorth;
+
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.FunctionInfo;
+import com.lapissea.jorth.lang.LocalsArray;
+import com.lapissea.jorth.lang.type.BaseType;
+import com.lapissea.jorth.lang.type.ClassInfo;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.FieldInfo;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
+import com.lapissea.jorth.lang.type.TypeSource;
+import com.lapissea.jorth.lang.type.TypeStack;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeSupplier;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+
+import java.lang.invoke.CallSite;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static org.objectweb.asm.Opcodes.*;
+
+sealed interface Insn{
+	default void print(DefinitionPrinter out){
+		InstructionPrinter.print(this, out);
+	}
+	
+	sealed interface ArgumentInsn extends Insn permits NewOp, InvokeOp, VirtualCallOp{
+		/**
+		 * -1 when there is no explicit, nonempty argument block.
+		 */
+		int argumentStart();
+		ArgumentInsn withArgumentStart(int start);
+	}
+	
+	sealed interface TerminatingInsn extends Insn{
+		boolean terminates();
+	}
+	
+	sealed interface BranchingInsn extends Insn{
+		void merge(TypeStack stack) throws MalformedJorth;
+	}
+	
+	private static GenericType doEquality(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
+		stack.requireElements(2);
+		GenericType a = stack.pop();
+		GenericType b = stack.pop();
+		
+		if(!a.instanceOf(typeSource, b) && !b.instanceOf(typeSource, a)){
+			throw new MalformedJorth(a + " not compatible with " + b);
+		}
+		return a;
+	}
+	
+	record IVal(int val) implements Insn{
+		public static void emit(MethodVisitor writer, int value){
+			if(value>=-1 && value<=5){
+				writer.visitInsn(ICONST_0 + value);
+			}else if(value>=Byte.MIN_VALUE && value<=Byte.MAX_VALUE){
+				writer.visitIntInsn(BIPUSH, value);
+			}else if(value>=Short.MIN_VALUE && value<=Short.MAX_VALUE){
+				writer.visitIntInsn(SIPUSH, value);
+			}else{
+				writer.visitLdcInsn(value);
+			}
+		}
+		
+		public static IVal simulate(TypeStack stack, int val){
+			stack.push(GenericType.INT);
+			return new IVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record LVal(long val) implements Insn{
+		public static void emit(MethodVisitor writer, long value){
+			if(value == 0L) writer.visitInsn(LCONST_0);
+			else if(value == 1L) writer.visitInsn(LCONST_1);
+			else writer.visitLdcInsn(value);
+		}
+		
+		public static LVal simulate(TypeStack stack, long val){
+			stack.push(GenericType.LONG);
+			return new LVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record FVal(float val) implements Insn{
+		public static void emit(MethodVisitor writer, float value){
+			if(value == 0.0f) writer.visitInsn(FCONST_0);
+			else if(value == 1.0f) writer.visitInsn(FCONST_1);
+			else if(value == 2.0f) writer.visitInsn(FCONST_2);
+			else writer.visitLdcInsn(value);
+		}
+		
+		public static FVal simulate(TypeStack stack, float val){
+			stack.push(GenericType.FLOAT);
+			return new FVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record DVal(double val) implements Insn{
+		public static void emit(MethodVisitor writer, double value){
+			if(value == 0.0d) writer.visitInsn(DCONST_0);
+			else if(value == 1.0d) writer.visitInsn(DCONST_1);
+			else writer.visitLdcInsn(value);
+		}
+		public static DVal simulate(TypeStack stack, double val){
+			stack.push(GenericType.DOUBLE);
+			return new DVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record BVal(boolean val) implements Insn{
+		public static void emit(MethodVisitor writer, boolean value){
+			if(value){
+				writer.visitInsn(ICONST_1);
+			}else{
+				writer.visitInsn(ICONST_0);
+			}
+		}
+		public static BVal simulate(TypeStack stack, boolean val){
+			stack.push(GenericType.BOOL);
+			return new BVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record StrVal(String val) implements Insn{
+		public StrVal{
+			Objects.requireNonNull(val);
+		}
+		public static StrVal simulate(TypeStack stack, String val){
+			stack.push(GenericType.STRING);
+			return new StrVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitLdcInsn(val);
+		}
+	}
+	
+	record ClassVal(GenericType type) implements Insn{
+		public static ClassVal simulate(TypeStack stack, ClassName clazz){
+			var type = new GenericType(clazz);
+			stack.push(new GenericType(ClassName.of(Class.class), Optional.empty(), 0, List.of(type)));
+			return new ClassVal(type);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitLdcInsn(org.objectweb.asm.Type.getType(type.jvmSignatureStr()));
+		}
+	}
+	
+	record PrimitiveCastOp(GenericType from, GenericType to) implements Insn{
+		
+		private enum StackKind{INT, LONG, FLOAT, DOUBLE}
+		
+		private static StackKind stackKind(GenericType t){
+			if(t.equals(GenericType.LONG)) return StackKind.LONG;
+			if(t.equals(GenericType.FLOAT)) return StackKind.FLOAT;
+			if(t.equals(GenericType.DOUBLE)) return StackKind.DOUBLE;
+			if(List.of(GenericType.BOOL, GenericType.BYTE, GenericType.SHORT, GenericType.CHAR, GenericType.INT).contains(t)){
+				return StackKind.INT;
+			}
+			throw new IllegalStateException(t + "");
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			if(from.equals(to)) return;
+			
+			if(to.equals(GenericType.BOOL)){
+				emitToTruthy(writer, stackKind(from));
+				return;
+			}
+			
+			var fromKind = stackKind(from);
+			var toKind   = stackKind(to);
+			
+			if(fromKind != toKind){
+				writer.visitInsn(categoryConvertOp(fromKind, toKind));
+			}
+			
+			if(toKind == StackKind.INT){
+				if(to.equals(GenericType.BYTE)) writer.visitInsn(I2B);
+				else if(to.equals(GenericType.CHAR)) writer.visitInsn(I2C);
+				else if(to.equals(GenericType.SHORT)) writer.visitInsn(I2S);
+			}
+		}
+		
+		private static int categoryConvertOp(StackKind from, StackKind to){
+			return switch(from){
+				case INT -> toOp(to, -1, I2L, I2F, I2D);
+				case LONG -> toOp(to, L2I, -1, L2F, L2D);
+				case FLOAT -> toOp(to, F2I, F2L, -1, F2D);
+				case DOUBLE -> toOp(to, D2I, D2L, D2F, -1);
+			};
+		}
+		private static int toOp(StackKind to, int intOp, int longOp, int floatOp, int doubleOp){
+			return switch(to){
+				case INT -> intOp;
+				case LONG -> longOp;
+				case FLOAT -> floatOp;
+				case DOUBLE -> doubleOp;
+			};
+		}
+		
+		private void emitToTruthy(MethodVisitor writer, StackKind fromKind){
+			switch(fromKind){
+				case LONG -> {
+					writer.visitInsn(LCONST_0);
+					writer.visitInsn(LCMP);
+				}
+				case FLOAT -> {
+					writer.visitInsn(FCONST_0);
+					writer.visitInsn(FCMPL);
+				}
+				case DOUBLE -> {
+					writer.visitInsn(DCONST_0);
+					writer.visitInsn(DCMPL);
+				}
+				case INT -> { /* already an int; compare directly below */ }
+			}
+			emitIntToTruthy(writer);
+		}
+		
+		private void emitIntToTruthy(MethodVisitor writer){
+			Label isTrue = new Label();
+			Label end    = new Label();
+			
+			// if int != 0, jump to true
+			writer.visitJumpInsn(IFNE, isTrue);
+			writer.visitInsn(ICONST_0);
+			writer.visitJumpInsn(GOTO, end);
+			
+			writer.visitLabel(isTrue);
+			writer.visitInsn(ICONST_1);
+			writer.visitLabel(end);
+		}
+	}
+	
+	record CastOp(GenericType type) implements Insn{
+		public static Insn simulate(TypeStack stack, TypeSource typeSource, GenericType type) throws MalformedJorth{
+			var stackType = stack.pop();
+			
+			if(type.equals(stackType)){
+				stack.push(type);
+				return null;
+			}
+			
+			if(stackType.getBaseType() != BaseType.OBJ && type.getBaseType() != BaseType.OBJ){
+				stack.push(type);
+				return new PrimitiveCastOp(stackType, type);
+			}
+			
+			if(!type.instanceOf(typeSource, stackType) && !stackType.instanceOf(typeSource, type)){
+				throw new MalformedJorth("Can not cast " + stackType + " to " + type);
+			}
+			stack.push(type);
+			return new CastOp(type);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitTypeInsn(CHECKCAST, type.dims() == 0? type.raw().slashed() : type.jvmDescriptorStr());
+		}
+	}
+	
+	record GetLocal(GenericType type, String name, int index) implements Insn{
+		public static GetLocal simulate(TypeStack stack, LocalsArray.Local local){
+			stack.push(local.type());
+			return new GetLocal(local.type(), local.name(), local.index());
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitVarInsn(type.getBaseType().loadOp, index);
+		}
+	}
+	
+	/**
+	 * Numeric relational comparison with Java binary numeric promotion.
+	 */
+	record NumericComparison(GenericType left, GenericType right, GenericType promoted,
+	                         boolean greater, boolean orEqual) implements Insn{
+		static NumericComparison simulate(TypeStack stack, boolean greater, boolean orEqual) throws MalformedJorth{
+			stack.requireElements(2);
+			var left  = stack.peek(stack.size() - 2);
+			var right = stack.peekLast();
+			for(var type : List.of(left, right)){
+				switch(type.getBaseType()){
+					case BYTE, SHORT, CHAR, INT, LONG, FLOAT, DOUBLE -> { }
+					default -> throw new MalformedJorth("Numeric comparison requires numeric primitives, got " + type);
+				}
+			}
+			var promoted = GenericType.INT;
+			for(var type : List.of(GenericType.DOUBLE, GenericType.FLOAT, GenericType.LONG)){
+				if(left.equals(type) || right.equals(type)){
+					promoted = type;
+					break;
+				}
+			}
+			stack.pop();
+			stack.pop();
+			stack.push(GenericType.BOOL);
+			return new NumericComparison(left, right, promoted, greater, orEqual);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			new PrimitiveCastOp(right, promoted).visit(writer);
+			if(left.getBaseType().loadOp != promoted.getBaseType().loadOp){
+				new SwapOp(promoted, left).visit(writer);
+				new PrimitiveCastOp(left, promoted).visit(writer);
+				new SwapOp(promoted, promoted).visit(writer);
+			}
+			int ifNotOp;
+			if(promoted.equals(GenericType.INT)){
+				ifNotOp = greater? (orEqual? IF_ICMPLT : IF_ICMPLE) : (orEqual? IF_ICMPGT : IF_ICMPGE);
+			}else{
+				// NaN must make every relational comparison false.
+				writer.visitInsn(switch(promoted.getBaseType()){
+					case LONG -> LCMP;
+					case FLOAT -> greater? FCMPL : FCMPG;
+					case DOUBLE -> greater? DCMPL : DCMPG;
+					default -> throw new IllegalStateException(promoted.toString());
+				});
+				ifNotOp = greater? (orEqual? IFLT : IFLE) : (orEqual? IFGT : IFGE);
+			}
+			Equality.branchCompareToBool(writer, ifNotOp);
+		}
+	}
+	
+	record Equality(GenericType type, boolean checkFor) implements Insn{
+		
+		public static Equality simulate(TypeSource typeSource, TypeStack stack, boolean checkFor) throws MalformedJorth{
+			GenericType a = doEquality(typeSource, stack);
+			
+			stack.push(GenericType.BOOL);
+			return new Equality(a, checkFor);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			BaseType prim = type.getPrimitiveType().orElse(BaseType.OBJ);
+			switch(prim.loadOp){
+				case ALOAD -> {
+					branchCompareToBool(writer, checkFor? IF_ACMPNE : IF_ACMPEQ);
+				}
+				case ILOAD -> {
+					branchCompareToBool(writer, checkFor? IF_ICMPNE : IF_ICMPEQ);
+				}
+				case LLOAD -> {
+					writer.visitInsn(LCMP);
+					branchCompareToBool(writer, checkFor? IFNE : IFEQ);
+				}
+				case FLOAD -> {
+					writer.visitInsn(FCMPL);
+					branchCompareToBool(writer, checkFor? IFNE : IFEQ);
+				}
+				case DLOAD -> {
+					writer.visitInsn(DCMPL);
+					branchCompareToBool(writer, checkFor? IFNE : IFEQ);
+				}
+				default -> {
+					throw new NotImplementedException("Unsupported primitive compare type: " + prim);
+				}
+			}
+		}
+		private static void branchCompareToBool(MethodVisitor writer, int ifNotOp){
+			Label falseL = new Label();
+			writer.visitJumpInsn(ifNotOp, falseL);
+			writer.visitInsn(ICONST_1);
+			Label endL = new Label();
+			writer.visitJumpInsn(GOTO, endL);
+			writer.visitLabel(falseL);
+			writer.visitInsn(ICONST_0);
+			writer.visitLabel(endL);
+		}
+	}
+	
+	record ReturnOp(BaseType typ) implements TerminatingInsn{
+		
+		static ReturnOp simulate(JType returnType, TypeSource typeSource, TypeStack stack, boolean modifyStack) throws MalformedJorth{
+			if(returnType != null){
+				var ret    = returnType.asGeneric();
+				var popped = modifyStack? stack.pop() : stack.peekLast();
+				if(!popped.instanceOf(typeSource, ret)){
+					throw new MalformedJorth("Method returns " + ret + " but " + popped + " is on stack");
+				}
+				return new ReturnOp(popped.getBaseType());
+			}else{
+				return new ReturnOp(BaseType.VOID);
+			}
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(typ.returnOp);
+		}
+		@Override
+		public boolean terminates(){
+			return true;
+		}
+	}
+	
+	record ThrowOp() implements TerminatingInsn{
+		private static final GenericType THROWABLE = GenericType.of(Throwable.class);
+		static ThrowOp simulate(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
+			var popped = stack.pop();
+			if(!popped.instanceOf(typeSource, THROWABLE)){
+				throw new MalformedJorth("Throws needs " + THROWABLE + " but " + popped + " is on stack");
+			}
+			return new ThrowOp();
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(ATHROW);
+		}
+		@Override
+		public boolean terminates(){
+			return true;
+		}
+	}
+	
+	record PopOp(int slots) implements Insn{
+		
+		static PopOp simulate(TypeStack stack) throws MalformedJorth{
+			var bt = stack.pop().getBaseType();
+			return new PopOp(bt.slots);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(switch(slots){
+				case 1 -> POP;
+				case 2 -> POP2;
+				default -> throw new ShouldNeverHappenError();
+			});
+		}
+	}
+	
+	record DupOp(int slots) implements Insn{
+		
+		static DupOp simulate(TypeStack stack) throws MalformedJorth{
+			var e = stack.peekLast();
+			stack.push(e);
+			return new DupOp(e.getBaseType().slots);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(switch(slots){
+				case 1 -> DUP;
+				case 2 -> DUP2;
+				default -> throw new ShouldNeverHappenError();
+			});
+		}
+	}
+	
+	record SwapOp(GenericType top, GenericType belowTop) implements Insn{
+		
+		static SwapOp simulate(TypeStack stack) throws MalformedJorth{
+			stack.requireElements(2);
+			var top      = stack.pop();
+			var belowTop = stack.pop();
+			
+			stack.push(top);
+			stack.push(belowTop);
+			return new SwapOp(top, belowTop);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(top.getBaseType().slots){
+				case 1 -> {
+					switch(belowTop.getBaseType().slots){
+						case 1 -> writer.visitInsn(SWAP);
+						case 2 -> {
+							writer.visitInsn(DUP_X2);
+							writer.visitInsn(POP);
+						}
+						default -> throw new NotImplementedException(belowTop.toString());
+					}
+				}
+				case 2 -> {
+					switch(belowTop.getBaseType().slots){
+						case 1 -> {
+							writer.visitInsn(DUP2_X1);
+							writer.visitInsn(POP2);
+						}
+						case 2 -> {
+							writer.visitInsn(DUP2_X2);
+							writer.visitInsn(POP2);
+						}
+						default -> throw new NotImplementedException(belowTop.toString());
+					}
+				}
+				default -> throw new NotImplementedException(top.toString());
+			}
+		}
+	}
+	
+	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse,
+	                       BranchPoint end) implements TerminatingInsn, BranchingInsn{
+		
+		enum Type{
+			TRUE_BOOL, EQUALITY
+		}
+		
+		static GenericType consumeCondition(TypeStack stack, TypeSource typeSource, Type type) throws MalformedJorth{
+			return switch(type){
+				case TRUE_BOOL -> {
+					var typ = stack.pop();
+					if(typ.getBaseType() != BaseType.BOOLEAN){
+						throw new MalformedJorth("Condition must be boolean but is " + typ);
+					}
+					yield null;
+				}
+				case EQUALITY -> doEquality(typeSource, stack);
+			};
+		}
+		static ConditionalJump simulate(CodeBlock caller, Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse){
+			var branch = new BranchPoint();
+			branch.addIngoing(onTrue != null? BranchPoint.Edge.capture("true branch", onTrue) :
+			                  new BranchPoint.Edge("true bypass", caller.stackView(), true));
+			branch.addIngoing(onFalse != null? BranchPoint.Edge.capture("false branch", onFalse) :
+			                  new BranchPoint.Edge("false bypass", caller.stackView(), true));
+			return new ConditionalJump(type, vType, onTrue, onFalse, branch);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			
+			Label endLabel   = new Label();
+			Label falseLabel = new Label();
+			
+			int toFalseOp;
+			int toTrueOp;
+			switch(type){
+				case TRUE_BOOL -> {
+					toFalseOp = Opcodes.IFEQ;
+					toTrueOp = Opcodes.IFNE;
+				}
+				case EQUALITY -> {
+					var bt = vType.getBaseType();
+					if(bt.cmpOp != -1){
+						writer.visitInsn(bt.cmpOp);
+						toFalseOp = Opcodes.IFNE;
+						toTrueOp = Opcodes.IFEQ;
+					}else{
+						toFalseOp = bt.neJumpOp;
+						toTrueOp = bt.eqJumpOp;
+					}
+				}
+				default -> throw new NotImplementedException(type.toString());
+			}
+			if(onTrue != null && onFalse != null){
+				writer.visitJumpInsn(toFalseOp, falseLabel);
+				onTrue.visit(writer);
+				writer.visitJumpInsn(GOTO, endLabel);
+				writer.visitLabel(falseLabel);
+				onFalse.visit(writer);
+				writer.visitLabel(endLabel);
+			}else if(onTrue != null){
+				writer.visitJumpInsn(toFalseOp, endLabel);
+				onTrue.visit(writer);
+				writer.visitLabel(endLabel);
+			}else{
+				writer.visitJumpInsn(toTrueOp, endLabel);
+				onFalse.visit(writer);
+				writer.visitLabel(endLabel);
+			}
+		}
+		public ConditionalJump withFalse(CodeBlock caller, CodeBlock onFalse){
+			return simulate(caller, type, vType, onTrue, onFalse);
+		}
+		@Override
+		public boolean terminates(){
+			return onTrue != null && onTrue.terminates() && onFalse != null && onFalse.terminates();
+		}
+		
+		@Override
+		public void merge(TypeStack stack) throws MalformedJorth{
+			var stackO = end.getOutgoingTypeStack();
+			if(stackO.isPresent()){
+				var s     = stackO.get();
+				var total = stack.totalStack().toList();
+				try{
+					int mark = 0;
+					for(int end = Math.min(s.size(), total.size()); mark<end; mark++){
+						if(!s.get(mark).equals(total.get(mark))){
+							break;
+						}
+					}
+					for(int i = mark; i<total.size(); i++){
+						stack.pop();
+					}
+					for(int i = mark; i<s.size(); i++){
+						stack.push(s.get(i));
+					}
+				}catch(Exception e){
+					throw new MalformedJorth("Failed merging new stack of:\n  " + s + " into\n  " + total);
+				}
+			}
+		}
+	}
+	
+	record NewOp(GenericType type, boolean dup, int argumentStart) implements ArgumentInsn{
+		@Override
+		public NewOp withArgumentStart(int start){
+			return new NewOp(type, dup, start);
+		}
+		
+		static NewOp simulate(TypeStack stack, GenericType type, boolean dup) throws MalformedJorth{
+			if(type.dims()<0 || type.dims()>255){
+				throw new MalformedJorth("Array dimensions must be between 0 and 255");
+			}
+			stack.requireElements(type.dims());
+			for(int i = 0; i<type.dims(); i++){
+				var arraySize = stack.pop();
+				if(!List.of(int.class, short.class, byte.class).contains(arraySize.getBaseType().type)){
+					throw new MalformedJorth("Array size is not an integer");
+				}
+			}
+			stack.push(type);
+			if(dup){
+				stack.push(type);
+			}
+			return new NewOp(type, dup, -1);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(type.dims()){
+				case 0 -> writer.visitTypeInsn(NEW, type.raw().slashed());
+				case 1 -> {
+					var component = type.withDims(0).getPrimitiveType().orElse(null);
+					if(component == null){
+						writer.visitTypeInsn(ANEWARRAY, type.raw().slashed());
+					}else{
+						int arrayType = switch(component){
+							case BOOLEAN -> T_BOOLEAN;
+							case CHAR -> T_CHAR;
+							case FLOAT -> T_FLOAT;
+							case DOUBLE -> T_DOUBLE;
+							case BYTE -> T_BYTE;
+							case SHORT -> T_SHORT;
+							case INT -> T_INT;
+							case LONG -> T_LONG;
+							default -> throw new IllegalStateException("Invalid primitive array component: " + component);
+						};
+						writer.visitIntInsn(NEWARRAY, arrayType);
+					}
+				}
+				default -> writer.visitMultiANewArrayInsn(type.jvmDescriptorStr(), type.dims());
+			}
+			if(dup){
+				writer.visitInsn(DUP);
+			}
+		}
+	}
+	
+	private static void popFieldOwner(TypeStack stack, TypeSource typeSource, FieldInfo field, ClassName owner) throws MalformedJorth{
+		if(field.isStatic()) return;
+		var stackOwnerType = stack.pop().raw();
+		if(!stackOwnerType.instanceOf(typeSource, owner)){
+			throw new ClassCastException(stackOwnerType + " not compatible with " + owner);
+		}
+	}
+	private static void fieldAccess(MethodVisitor writer, FieldInfo field, int accOp){
+		var type = field.type().asGeneric().withoutArgs();
+		writer.visitFieldInsn(accOp, field.owner().slashed(), field.name(), type.jvmDescriptorStr());
+	}
+	
+	record PutFieldOp(FieldInfo field) implements Insn{
+		
+		static PutFieldOp simulate(TypeStack stack, TypeSource typeSource, ClassName caller, FieldInfo field) throws MalformedJorth{
+			stack.requireElements(field.isStatic()? 1 : 2);
+			MemberAccess.check(typeSource, caller, field.owner(), field.name(), field.visibility(),
+			                   field.isStatic()? null : stack.peek(stack.size() - 2), false);
+			var valueType = stack.pop().withoutArgs();
+			var type      = field.type().asGeneric().withoutArgs();
+			
+			if(!valueType.instanceOf(typeSource, type)){
+				throw new ClassCastException(valueType + " not compatible with " + type);
+			}
+			
+			Insn.popFieldOwner(stack, typeSource, field, field.owner());
+			return new PutFieldOp(field);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			fieldAccess(writer, field, field.isStatic()? PUTSTATIC : PUTFIELD);
+		}
+	}
+	
+	record GetFieldOp(FieldInfo field) implements Insn{
+		
+		static GetFieldOp simulate(TypeStack stack, TypeSource typeSource, ClassName caller, FieldInfo field) throws MalformedJorth{
+			MemberAccess.check(typeSource, caller, field.owner(), field.name(), field.visibility(),
+			                   field.isStatic()? null : stack.peekLast(), false);
+			var type = field.type().asGeneric().withoutArgs();
+			Insn.popFieldOwner(stack, typeSource, field, field.owner());
+			stack.push(type);
+			return new GetFieldOp(field);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			fieldAccess(writer, field, field.isStatic()? GETSTATIC : GETFIELD);
+		}
+	}
+	
+	record PutLocalVarOp(BaseType type, int index, String name) implements Insn{
+		
+		static PutLocalVarOp simulate(TypeStack stack, TypeSource typeSource, LocalsArray.Local local) throws MalformedJorth{
+			var fieldType = local.type();
+			var type      = stack.pop();
+			if(!type.instanceOf(typeSource, fieldType)){
+				throw new MalformedJorth("Tried to set local field of type " + fieldType + " to " + type);
+			}
+			return new PutLocalVarOp(fieldType.getBaseType(), local.index(), local.name());
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitVarInsn(type.storeOp, index);
+		}
+	}
+	
+	
+	record PutElementOp(GenericType element) implements Insn{
+		
+		static PutElementOp simulate(TypeStack stack, TypeSource typeSource) throws MalformedJorth{
+			GenericType element = stack.pop();
+			GenericType index   = stack.pop();
+			GenericType array   = stack.pop();
+			
+			if(!index.getBaseType().arrayIndexCompatible){
+				throw new MalformedJorth(index + " can not be used as array index");
+			}
+			if(array.dims() == 0){
+				throw new MalformedJorth(array + " is not an array");
+			}
+			if(!element.instanceOf(typeSource, array.withDims(array.dims() - 1))){
+				throw new MalformedJorth("can not store " + element + " in " + array);
+			}
+			return new PutElementOp(element);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(element.getBaseType().arrayStoreOP);
+		}
+	}
+	
+	record GetElementOp(GenericType element) implements Insn{
+		
+		static GetElementOp simulate(TypeStack stack, TypeSource typeSource) throws MalformedJorth{
+			var index = stack.pop();
+			if(!index.equals(GenericType.INT)){
+				throw new MalformedJorth("The index of the array element must be an integer but is: " + index);
+			}
+			var array = stack.pop();
+			if(array.dims() == 0){
+				throw new MalformedJorth("The array element type must have at least one dimension but is: " + array);
+			}
+			var elementType = array.withDims(array.dims() - 1);
+			stack.push(elementType);
+			
+			return new GetElementOp(elementType);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(element.getBaseType().arrayLoadOP);
+		}
+	}
+	
+	
+	record InvokeOp(FunctionInfo function, boolean superCall, ClassName caller, int argumentStart) implements ArgumentInsn{
+		@Override
+		public InvokeOp withArgumentStart(int start){
+			return new InvokeOp(function, superCall, caller, start);
+		}
+		
+		static InvokeOp simulate(TypeStack stack, TypeSource typeSource, ClassName caller, FunctionInfo function, boolean superCall) throws MalformedJorth{
+			ClassInfo owner = function.ownerInfo();
+			String    name  = function.name();
+			
+			var returnType = function.returnType();
+			var argTypes   = function.argumentTypes();
+			stack.requireElements(argTypes.size() + (function.isStatic()? 0 : 1));
+			MemberAccess.check(typeSource, caller, owner.name(), name, function.visibility(),
+			                   function.isStatic()? null : stack.peek(stack.size() - argTypes.size() - 1),
+			                   name.equals("<init>"));
+			
+			for(int i = argTypes.size() - 1; i>=0; i--){
+				var popped = stack.pop();
+				var arg    = argTypes.get(i).asGeneric();
+				if(popped.instanceOf(typeSource, arg)) continue;
+				
+				throw new MalformedJorth("Argument " + i + " in " + owner.name() + "#" + name + " is " + arg + " but got " + popped);
+			}
+			if(!function.isStatic()){
+				var popped = stack.pop();
+				var arg    = new GenericType(owner.name());
+				
+				if(!popped.instanceOf(typeSource, arg)){
+					throw new MalformedJorth("Function caller is " + owner.name() + " but callee on stack is " + popped);
+				}
+			}
+			
+			if(returnType != null){
+				stack.push(returnType.asGeneric());
+			}
+			
+			return new InvokeOp(function, superCall, caller, -1);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			ClassInfo owner = function.ownerInfo();
+			String    name  = function.name();
+			
+			
+			var ownerName = owner.name().slashed();
+			var ownerType = owner.type();
+			
+			int callOp;
+			if(function.isStatic()){
+				callOp = INVOKESTATIC;
+			}else if(owner.type() == ClassType.INTERFACE){
+				callOp = INVOKEINTERFACE;
+			}else{
+				//https://stackoverflow.com/a/13764338
+				if(superCall || name.equals("<init>") || (function.visibility() == Visibility.PRIVATE && owner.name().equals(caller))){
+					callOp = INVOKESPECIAL;
+				}else{
+					callOp = INVOKEVIRTUAL;
+				}
+			}
+			
+			var signature = makeFunSig(function.returnType(), function.argumentTypes(), false);
+			
+			writer.visitMethodInsn(callOp, ownerName, name, signature, ownerType == ClassType.INTERFACE);
+		}
+		
+		private static String makeFunSig(JType returnType, Collection<JType> args, boolean signature){
+			
+			int len = 2 + (returnType != null? returnType.jvmStringLen(signature) : 1);
+			for(var arg : args){
+				len += arg.jvmStringLen(signature);
+			}
+			
+			StringBuilder result = new StringBuilder(len);
+			result.append('(');
+			for(var arg : args){
+				arg.jvmString(result, signature);
+			}
+			result.append(')');
+			if(returnType != null) returnType.jvmString(result, signature);
+			else result.append('V');
+			
+			assert result.length() == len : result.length() + " " + len;
+			
+			return result.toString();
+		}
+	}
+	
+	record VirtualCallOp(FunctionInfo.Signature callingSignature, GenericType callingReturnType, Handle bootstrapHandle,
+	                     Object[] bootstrapArgs, int argumentStart) implements ArgumentInsn{
+		@Override
+		public VirtualCallOp withArgumentStart(int start){
+			return new VirtualCallOp(callingSignature, callingReturnType, bootstrapHandle, bootstrapArgs, start);
+		}
+		
+		static VirtualCallOp simulate(TypeStack stack, TypeSource typeSource, BootstrapFn boot, CallingFn callingFn, List<JType> args) throws MalformedJorth{
+			if(args.size() != callingFn.args.size()){
+				throw new MalformedJorth("Call args size mismatch:\n\t" + "Requested: " + callingFn.args + "\n\t" + "But got:   " + args);
+			}
+			for(int i = 0; i<args.size(); i++){
+				var argType = args.get(i);
+				var defType = callingFn.args.get(i);
+				if(!argType.asGeneric().instanceOf(typeSource, defType.asGeneric())){
+					throw new MalformedJorth("Argument " + i + " does not satisfy type of argument. Is " + argType.asGeneric() + " but " + defType.asGeneric() + " is required");
+				}
+			}
+			
+			for(int i = 0; i<args.size(); i++){
+				stack.pop();
+			}
+			
+			if(callingFn.returns != null){
+				stack.push(callingFn.returns.asGeneric());
+			}
+			
+			List<JType> bArgs = new ArrayList<>(3 + boot.bootstrapStaticArgs.size());
+			bArgs.add(GenericType.of(MethodHandles.Lookup.class));
+			bArgs.add(GenericType.of(String.class));
+			bArgs.add(GenericType.of(MethodType.class));
+			for(var arg : boot.bootstrapStaticArgs){
+				bArgs.add(arg.type());
+			}
+			
+			ClassInfo    bootstrapClass = typeSource.byName(boot.owner);
+			FunctionInfo bootstrapFn    = pickBootstrapFunction(typeSource, boot, bootstrapClass, bArgs);
+			
+			Handle bsmh = new Handle(H_INVOKESTATIC, boot.owner.slashed(), boot.functionName, InvokeOp.makeFunSig(bootstrapFn.returnType(), bootstrapFn.argumentTypes(), false), bootstrapFn.ownerInfo().isInterface());
+			
+			var staticArgs = boot.bootstrapStaticArgs.stream().map(BootstrapFn.StaticArg::value).toArray();
+			
+			return new VirtualCallOp(new FunctionInfo.Signature(callingFn.name, callingFn.args), callingFn.returns, bsmh, staticArgs, -1);
+		}
+		private static FunctionInfo pickBootstrapFunction(TypeSource typeSource, BootstrapFn bootstrap, ClassInfo bc, List<JType> bArgs) throws MalformedJorth{
+			var fns = bc.getFunctionsByName(bootstrap.functionName).filter(e -> {
+				if(!e.returnType().equals(JType.of(CallSite.class))){
+					return false;
+				}
+				var argTypes = e.argumentTypes();
+				if(argTypes.size() != bArgs.size()){
+					return false;
+				}
+				for(int i = 0; i<bArgs.size(); i++){
+					var argType = bArgs.get(i).asGeneric();
+					var fnType  = argTypes.get(i).asGeneric();
+					try{
+						if(!argType.instanceOf(typeSource, fnType)){
+							return false;
+						}
+					}catch(MalformedJorth ex){
+						throw UtilL.uncheckedThrow(ex);
+					}
+				}
+				return true;
+			}).toList();
+			
+			if(fns.isEmpty()){
+				throw new MalformedJorth("No valid boostrap function found for " + bootstrap.owner + "." + bootstrap.functionName + bArgs.stream().map(Object::toString).collect(Collectors.joining(", ", "(", ")")));
+			}
+			if(fns.size() != 1){
+				throw new MalformedJorth("Ambiguous boostrap function found for " + bootstrap.owner + "#" + bootstrap.functionName);
+			}
+			return fns.getFirst();
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInvokeDynamicInsn(callingSignature.name(), InvokeOp.makeFunSig(callingReturnType, callingSignature.args(), false), bootstrapHandle, bootstrapArgs);
+		}
+	}
+	
+	/** Arithmetic uses JVM numeric categories; small integral operands produce int. */
+	enum ArithmeticOp{
+		ADD(IADD), SUB(ISUB), MUL(IMUL), DIV(IDIV), MOD(IREM), NEG(INEG);
+		final int opcode;
+		ArithmeticOp(int opcode){ this.opcode = opcode; }
+	}
+
+	record Arithmetic(ArithmeticOp operation, BaseType type, Number constant) implements Insn{
+		private static BaseType numericType(GenericType type) throws MalformedJorth{
+			if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) ||
+			   type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)) return BaseType.INT;
+			if(type.equals(GenericType.LONG)) return BaseType.LONG;
+			if(type.equals(GenericType.FLOAT)) return BaseType.FLOAT;
+			if(type.equals(GenericType.DOUBLE)) return BaseType.DOUBLE;
+			throw new MalformedJorth("Arithmetic requires a numeric primitive, got " + type);
+		}
+		static Arithmetic simulate(TypeStack stack, ArithmeticOp operation, Number constant) throws MalformedJorth{
+			int count = constant != null || operation == ArithmeticOp.NEG? 1 : 2;
+			stack.requireElements(count);
+			// Validate before changing the stack, including the code-path ownership boundary.
+			if(stack.getLocalPortion().size()<count){
+				throw new MalformedJorth("can not pop values outside the code path");
+			}
+			var type = numericType(stack.peekLast());
+			if(constant == null && count == 2){
+				var left = numericType(stack.peek(stack.size() - 2));
+				if(left != type) throw new MalformedJorth("Arithmetic operands have incompatible types: " + left + " and " + type);
+			}else if(constant != null && !(constant instanceof Integer)){
+				var expected = constant instanceof Long? BaseType.LONG : constant instanceof Float? BaseType.FLOAT : BaseType.DOUBLE;
+				if(type != expected) throw new MalformedJorth("Arithmetic constant requires " + expected + ", got " + type);
+			}
+			for(int i = 0; i<count; i++) stack.pop();
+			stack.push(switch(type){
+				case INT -> GenericType.INT;
+				case LONG -> GenericType.LONG;
+				case FLOAT -> GenericType.FLOAT;
+				case DOUBLE -> GenericType.DOUBLE;
+				default -> throw new IllegalStateException();
+			});
+			return new Arithmetic(operation, type, constant);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			if(constant != null){
+				switch(type){
+					case INT -> IVal.emit(writer, constant.intValue());
+					case LONG -> LVal.emit(writer, constant.longValue());
+					case FLOAT -> FVal.emit(writer, constant.floatValue());
+					case DOUBLE -> DVal.emit(writer, constant.doubleValue());
+					default -> throw new IllegalStateException();
+				}
+			}
+			int offset = switch(type){
+				case INT -> 0;
+				case LONG -> 1;
+				case FLOAT -> 2;
+				case DOUBLE -> 3;
+				default -> throw new IllegalStateException();
+			};
+			writer.visitInsn(operation.opcode + offset);
+		}
+	}
+	
+	record BitShiftLeft(BaseType type) implements Insn{
+		
+		public static BitShiftLeft simulate(TypeStack stack) throws MalformedJorth{
+			var offset = stack.pop();
+			if(!offset.equals(GenericType.INT)){
+				throw new MalformedJorth("The bit shift amount must be an int but is: " + offset);
+			}
+			var      value = stack.pop();
+			BaseType typ;
+			if(value.equals(GenericType.INT)){
+				typ = BaseType.INT;
+			}else if(value.equals(GenericType.LONG)){
+				typ = BaseType.LONG;
+			}else{
+				throw new MalformedJorth("Cannot bit shift stack value of type: " + value);
+			}
+			stack.push(value);
+			return new BitShiftLeft(typ);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(type){
+				case OBJ, VOID, CHAR, BYTE, SHORT, BOOLEAN, FLOAT, DOUBLE -> throw new IllegalStateException();
+				case INT -> {
+					writer.visitInsn(ISHL);
+				}
+				case LONG -> {
+					writer.visitInsn(LSHL);
+				}
+			}
+		}
+	}
+	
+	record BitShiftRight(BaseType type, boolean logical) implements Insn{
+		
+		public static BitShiftRight simulate(TypeStack stack, boolean logical) throws MalformedJorth{
+			var offset = stack.pop();
+			if(!offset.equals(GenericType.INT)){
+				throw new MalformedJorth("The bit shift amount must be an int but is: " + offset);
+			}
+			var      value = stack.pop();
+			BaseType typ;
+			if(value.equals(GenericType.INT)){
+				typ = BaseType.INT;
+			}else if(value.equals(GenericType.LONG)){
+				typ = BaseType.LONG;
+			}else{
+				throw new MalformedJorth("Cannot bit shift stack value of type: " + value);
+			}
+			stack.push(value);
+			return new BitShiftRight(typ, logical);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(type){
+				case OBJ, VOID, CHAR, BYTE, SHORT, BOOLEAN, FLOAT, DOUBLE -> throw new IllegalStateException();
+				case INT -> {
+					writer.visitInsn(logical? IUSHR : ISHR);
+				}
+				case LONG -> {
+					writer.visitInsn(logical? LUSHR : LSHR);
+				}
+			}
+		}
+	}
+	
+	record BitAnd(boolean isLong) implements Insn{
+		
+		public static BitAnd simulate(TypeStack stack) throws MalformedJorth{
+			var a = stack.pop();
+			var b = stack.pop();
+			
+			var isLong = a.equals(GenericType.LONG);
+			
+			if(!a.equals(GenericType.INT) && !isLong){
+				throw new MalformedJorth("For bit-and, the stack must have 2 elements of int or long are: " + a + " and " + b);
+			}
+			if(!a.equals(b)){
+				throw new MalformedJorth("For bit-and, the last 2 stack elements must have the same type but are: " + a + " and " + b);
+			}
+			
+			stack.push(a);
+			return new BitAnd(isLong);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(isLong? LAND : IAND);
+		}
+	}
+		record BitOr(boolean isLong) implements Insn{
+
+		public static BitOr simulate(TypeStack stack) throws MalformedJorth{
+			var a = stack.pop();
+			var b = stack.pop();
+
+			var isLong = a.equals(GenericType.LONG);
+
+			if(!a.equals(GenericType.INT) && !isLong){
+				throw new MalformedJorth("For bit-or, the stack must have 2 elements of int or long are: " + a + " and " + b);
+			}
+			if(!a.equals(b)){
+				throw new MalformedJorth("For bit-or, the last 2 stack elements must have the same type but are: " + a + " and " + b);
+			}
+
+			stack.push(a);
+			return new BitOr(isLong);
+		}
+
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(isLong? LOR : IOR);
+		}
+	}
+
+	record NullConstant() implements Insn{
+		
+		public static NullConstant simulate(TypeStack stack, GenericType type) throws MalformedJorth{
+			if(type.getBaseType() != BaseType.OBJ || type.raw().any().equals("void")){
+				throw new MalformedJorth("For null constant, the type must be object but is: " + type);
+			}
+			stack.push(type);
+			return new NullConstant();
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(ACONST_NULL);
+		}
+	}
+	
+	record LoopJump(LoopContext context, boolean isBreak) implements TerminatingInsn{
+		@Override
+		public boolean terminates(){
+			return true;
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			context.emitJump(writer, isBreak);
+		}
+	}
+	
+	record WhileLoop(LoopContext context, CodeBlock check, CodeBlock body) implements Insn{
+		static WhileLoop simulate(LoopContext context, CodeBlock check, CodeBlock body) throws MalformedJorth{
+			if(check.terminates()) throw new MalformedJorth("Loop check must not terminate");
+			context.complete(check, body);
+			return new WhileLoop(context, check, body);
+		}
+		@Override
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			context.visit(writer, check, body);
+		}
+	}
+	
+	record InlineBlock(CodeBlock block) implements TerminatingInsn{
+		
+		public static InlineBlock simulate(CodeBlock block){
+			return new InlineBlock(block);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			block.visit(writer);
+		}
+		@Override
+		public boolean terminates(){
+			return block.terminates();
+		}
+	}
+	
+	record LazyBlock(UnsafeSupplier<CodeBlock, MalformedJorth> code) implements TerminatingInsn{
+		
+		public static LazyBlock simulate(UnsafeSupplier<CodeBlock, MalformedJorth> code){
+			return new LazyBlock(code);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			code.get().visit(writer);
+		}
+		@Override
+		public boolean terminates(){
+			return false;
+		}
+	}
+	
+	final class TryBlock implements TerminatingInsn, BranchingInsn{
+		
+		record Handler(ClassName type, LocalsArray.Local exception, CodeBlock body){ }
+		
+		final CodeBlock     body;
+		final List<Handler> handlers = new ArrayList<>();
+		boolean sealed;
+		
+		TryBlock(CodeBlock body){
+			this.body = body;
+		}
+		@Override
+		public void merge(TypeStack stack) throws MalformedJorth{
+			sealed = true;
+			if(handlers.isEmpty()){
+				throw new MalformedJorth("Try requires a catch clause");
+			}
+			
+			var point = new BranchPoint();
+			point.addIngoing(BranchPoint.Edge.capture("try", body));
+			
+			for(var handler : handlers){
+				point.addIngoing(BranchPoint.Edge.capture("catch " + handler.type().dotted(), handler.body()));
+			}
+			
+			var outgoing = point.getOutgoingTypeStack();
+			stack.getLocalPortion().clear();
+			outgoing.ifPresent(types -> types.forEach(stack::push));
+		}
+		@Override
+		public boolean terminates(){
+			if(!body.terminates()) return false;
+			for(Handler h : handlers){
+				if(!h.body().terminates()){
+					return false;
+				}
+			}
+			return true;
+		}
+		@Override
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			var start         = new Label();
+			var end           = new Label();
+			var merge         = new Label();
+			var handlerLabels = new ArrayList<Label>();
+			
+			writer.visitLabel(start);
+			writer.visitInsn(NOP); // Try needs a nonempty protected range.
+			
+			body.visit(writer);
+			
+			writer.visitLabel(end);
+			
+			if(!body.terminates()){
+				writer.visitJumpInsn(GOTO, merge);
+			}
+			
+			for(var handler : handlers){
+				var label = new Label();
+				handlerLabels.add(label);
+				writer.visitLabel(label);
+				
+				if(handler.exception() == null){
+					writer.visitInsn(POP);
+				}else{
+					writer.visitVarInsn(ASTORE, handler.exception().index());
+				}
+				handler.body().visit(writer);
+				if(!handler.body().terminates()){
+					writer.visitJumpInsn(GOTO, merge);
+				}
+			}
+			writer.visitLabel(merge);
+			
+			for(int i = 0; i<handlers.size(); i++){
+				writer.visitTryCatchBlock(start, end, handlerLabels.get(i), handlers.get(i).type().slashed());
+			}
+		}
+	}
+	
+	void visit(MethodVisitor writer) throws MalformedJorth;
+}

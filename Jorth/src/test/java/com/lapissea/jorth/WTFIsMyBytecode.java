@@ -1,6 +1,7 @@
 package com.lapissea.jorth;
 
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,6 +18,8 @@ public class WTFIsMyBytecode<ARG>{
 	List<String> strs;
 	
 	ARG arg;
+	
+	static int dummy;
 	
 	static{
 		int a = 0;
@@ -51,5 +54,37 @@ public class WTFIsMyBytecode<ARG>{
 		var b = (String[])o;
 		var c = (List<String>)o;
 		return a;
+	}
+	public void plusplus(int v){
+		v++;
+	}
+	public void plusplus(long v){
+		v++;
+	}
+	public void shift(int v){
+		var a = v >>> 1;
+		var b = v>>2;
+		var c = v<<3;
+	}
+	public void variable(){
+		List<Writer> thing = new ArrayList<>();
+		dummy++;
+		thing.add(null);
+		dummy++;
+	}
+	public static void staticVar(){
+		int thing = 100000;
+	}
+	public static boolean l2b(long thing){
+		return thing != 0;
+	}
+	public static boolean i2b(int thing){
+		return thing != 0;
+	}
+	
+	public static void ifEquals(Object a, Object b){
+		if(a != b){
+			System.out.println("Equals");
+		}
 	}
 }

@@ -22,12 +22,16 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 
@@ -37,7 +41,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
+public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{
@@ -184,11 +188,6 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		}
 	}
 	
-	private IOType getType(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
-		int id = typeID.getValue(ioPool, instance);
-		return provider.getTypeDb().fromID(id);
-	}
-	
 	private ValueType readValue(DataProvider provider, IOType type, Reference readNew, GenericContext genericContext) throws IOException{
 		try(var io = readNew.io(provider)){
 			//noinspection unchecked
@@ -206,8 +205,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			}
 			val = null;
 		}else{
-			var type = getType(ioPool, provider, instance);
-			val = readValue(provider, type, ref, makeContext(genericContext));
+			val = readReferencedValue(provider, typeID.getValue(ioPool, instance), ref, genericContext);
 		}
 		set(ioPool, instance, val);
 	}
@@ -220,5 +218,28 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	@Override
 	protected IOField<CTyp, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
 		return this;
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		var reference = getDependencies().requireExact(Reference.class, FieldNames.ref(getAccessor()));
+		accessMap.set(getAccessor(), body, value -> {
+			accessMap.get(reference, value);
+			value.call("isNull").ifTrue(empty -> {
+				if(nullable()) empty.nullVal(getType());
+				else empty.throwNew(NullPointerException.class);
+			}).elseRun(present -> {
+				present.call(CodeUtils.class, "dynamic_readReference", args -> {
+					accessMap.getFieldRef(this, args);
+					accessMap.get(typeID, args);
+					accessMap.get(reference, args);
+					args.get("provider").get("genericContext");
+				}).cast(getType());
+			});
+		});
+	}
+
+	public ValueType readReferencedValue(DataProvider provider, int id, Reference reference, GenericContext genericContext) throws IOException{
+		return readValue(provider, provider.getTypeDb().fromID(id), reference, makeContext(genericContext));
 	}
 }
