@@ -5,7 +5,7 @@ import org.testng.annotations.Test;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 /**
  * Regression for {@link Plan#saveFail(java.io.File)} overwriting an existing save file with a partial /

@@ -253,16 +253,16 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, IOType nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
 		try(var ignored = provider.getSource().startTransaction()){
 			var nextSize = getNextSize(next, provider);
-		
+			
 			var bytes = 1 + nextSize.bytes + switch(sizeDescriptor){
 				case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
 				case SizeDescriptor.Unknown unknown ->
 					unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
 				case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 			};
-		
-			Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
-			var transactionResult = new IONode<>(provider, chunk, nodeType, value, next);
+			
+			Chunk chunk             = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
+			var   transactionResult = new IONode<>(provider, chunk, nodeType, value, next);
 			ignored.commit();
 			return transactionResult;
 		}

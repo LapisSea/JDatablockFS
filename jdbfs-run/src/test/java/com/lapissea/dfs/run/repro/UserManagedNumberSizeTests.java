@@ -23,15 +23,15 @@ public class UserManagedNumberSizeTests{
 		@IOValue
 		@IOValue.Unsigned
 		@IODependency.NumSize("valueSize")
-		private int value;
-
+		private int        value;
+		
 		public SizedValue(){ }
 		SizedValue(NumberSize size, int value){
 			this.valueSize = size;
 			this.value = value;
 		}
 	}
-
+	
 	@org.testng.annotations.DataProvider
 	public Object[][] values(){
 		return new Object[][]{
@@ -45,12 +45,12 @@ public class UserManagedNumberSizeTests{
 			{NumberSize.INT, Integer.MAX_VALUE, true}
 		};
 	}
-
+	
 	@Test(dataProvider = "values")
 	public void explicitSizeMustFitValue(NumberSize size, int value, boolean fits) throws IOException{
 		var provider = DataProvider.newVerySimpleProvider();
-		var pipe = StandardStructPipe.of(SizedValue.class);
-		var out = new ContentOutputBuilder();
+		var pipe     = StandardStructPipe.of(SizedValue.class);
+		var out      = new ContentOutputBuilder();
 		var instance = new SizedValue(size, value);
 		if(!fits){
 			assertThatThrownBy(() -> pipe.write(provider, out, instance)).isInstanceOf(VaryingSize.TooSmall.class);

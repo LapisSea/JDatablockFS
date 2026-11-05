@@ -9,16 +9,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
-import java.util.AbstractList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Objects;
-import java.util.OptionalInt;
-import java.util.SequencedSet;
-import java.util.Spliterator;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 import java.util.stream.Stream;
@@ -86,7 +77,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 		}
 		return universe[ordinal];
 	}
-
+	
 	public T read(BitReader source) throws IOException{
 		return decodeOrdinal((int)source.readBits(bitSize));
 	}
@@ -132,13 +123,13 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 			return read(len, bits);
 		}
 	}
-
+	
 	public void write(List<T> enums, ContentWriter dest) throws IOException{
 		try(var bits = new BitOutputStream(dest)){
 			write(enums, bits);
 		}
 	}
-
+	
 	@SuppressWarnings("unchecked")
 	public T[] read(int len, BitReader src) throws IOException{
 		var arr = (T[])Array.newInstance(type, len);

@@ -71,18 +71,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
@@ -872,8 +861,8 @@ public class BinaryGridRenderer implements DataRenderer{
 					assert annCtx.stack.isEmpty();
 					annCtx.stack.add(null);
 					
-					var done = new ChunkSet();
-					long pos = cluster.getFirstChunk().getPtr().getValue();
+					var  done = new ChunkSet();
+					long pos  = cluster.getFirstChunk().getPtr().getValue();
 					while(pos<bytes.length){
 						try{
 							var extent = PhysicalExtent.read(provider, ChunkPointer.of(pos));
@@ -943,9 +932,9 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	private void annotateFreeChunk(AnnotateCtx ctx, FreeChunk free){
-		var start = free.getPtr().getValue();
+		var start     = free.getPtr().getValue();
 		var headerEnd = start + free.getHeaderSize();
-		var color = ColorUtils.alpha(Color.YELLOW, 0.5F);
+		var color     = ColorUtils.alpha(Color.YELLOW, 0.5F);
 		drawByteRanges(ctx.renderCtx, List.of(new DrawUtils.Range(start, headerEnd)), color, true, true);
 		drawByteRanges(ctx.renderCtx, List.of(new DrawUtils.Range(headerEnd, free.dataEnd())),
 		               ColorUtils.alpha(Color.YELLOW, 0.15F), false, false);
@@ -963,7 +952,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	private static long dataStart(PhysicalExtent extent){
 		return extent.getPtr().getValue() + extent.getHeaderSize();
 	}
-
+	
 	private void annotateChunk(AnnotateCtx ctx, Chunk chunk) throws IOException{
 		annotateStruct(ctx, chunk, null, Chunk.PIPE, null, true, false);
 		var rctx = ctx.renderCtx;

@@ -46,8 +46,8 @@ public class WindowsBootstrapTest{
 	
 	@Test
 	public void longInvocationSpecIsSessionScopedAndCleanedByFailed() throws Exception{
-		var session  = UUID.randomUUID();
-		var captured = new ArrayList<String>();
+		var                           session  = UUID.randomUUID();
+		var                           captured = new ArrayList<String>();
 		HostBootstrap.PayloadTransfer transfer = (command, payload) -> captured.add(decode(command));
 		
 		WindowsBootstrap.INSTANCE.remoteInvocation(session, List.of("java", "-cp", "x".repeat(40_000)), transfer);
@@ -150,8 +150,8 @@ public class WindowsBootstrapTest{
 			var directory = Files.createDirectory(cache.resolve("c".repeat(64)));
 			var file      = Files.writeString(directory.resolve("user-file.jar"), "user");
 			
-			var phase  = WindowsBootstrap.INSTANCE.prepare(cache.toString(), root.resolve("runs").toString(), UUID.randomUUID(),
-			                                               List.of("c".repeat(64) + "/dependency.jar"));
+			var phase = WindowsBootstrap.INSTANCE.prepare(cache.toString(), root.resolve("runs").toString(), UUID.randomUUID(),
+			                                              List.of("c".repeat(64) + "/dependency.jar"));
 			var result = runScript(decodeScript(phase.command()), stdinLines(phase.stdinLines()));
 			
 			assertNotEquals(result.exit(), 0);
@@ -166,9 +166,9 @@ public class WindowsBootstrapTest{
 	public void uploadPublishesTarEntries() throws Exception{
 		var root = Files.createTempDirectory("win-bootstrap-upload-");
 		try{
-			var cache  = Files.createDirectory(root.resolve("cache"));
-			var source = Files.writeString(root.resolve("input.jar"), "artifact");
-			var name   = "a".repeat(64) + "/dependency jar.jar";
+			var cache   = Files.createDirectory(root.resolve("cache"));
+			var source  = Files.writeString(root.resolve("input.jar"), "artifact");
+			var name    = "a".repeat(64) + "/dependency jar.jar";
 			var archive = new ByteArrayOutputStream();
 			TarIO.write(archive, List.of(new RuntimeBundle.Artifact(name, source)));
 			
@@ -180,7 +180,7 @@ public class WindowsBootstrapTest{
 			assertTrue(Files.isRegularFile(published));
 			assertEquals(Files.readString(published), "artifact");
 			assertEquals(Files.readString(cache.resolve("a".repeat(64)).resolve(".fuzzer-managed")), RemoteWorkspace.MARKER);
-			assertTrue(Files.getLastModifiedTime(published).toMillis() > System.currentTimeMillis() - 60_000);
+			assertTrue(Files.getLastModifiedTime(published).toMillis()>System.currentTimeMillis() - 60_000);
 			assertFalse(Files.exists(cache.resolve(".fuzzer-managed")));
 			assertFalse(Files.exists(cache.resolve(".upload-" + session)));
 		}finally{
@@ -195,8 +195,8 @@ public class WindowsBootstrapTest{
 			var cache = Files.createDirectory(root.resolve("cache"));
 			var name  = "c".repeat(64) + "/dependency.jar";
 			Files.createDirectory(cache.resolve("c".repeat(64)));
-			var file   = Files.writeString(cache.resolve(name), "user data");
-			var source = Files.writeString(root.resolve("input.jar"), "new data");
+			var file    = Files.writeString(cache.resolve(name), "user data");
+			var source  = Files.writeString(root.resolve("input.jar"), "new data");
 			var archive = new ByteArrayOutputStream();
 			TarIO.write(archive, List.of(new RuntimeBundle.Artifact(name, source)));
 			
@@ -242,7 +242,7 @@ public class WindowsBootstrapTest{
 	public void specTransportRoundTripsInvocationStdinAndExitCode() throws Exception{
 		var root = Files.createTempDirectory("win-bootstrap-spec-");
 		try{
-			var spec = root.resolve("spec.txt");
+			var spec    = root.resolve("spec.txt");
 			var payload = String.join("\n", "/bin/cat").getBytes(StandardCharsets.UTF_8);
 			var written = runScript(decodeScript(WindowsBootstrap.stdinWriter(spec.toString())), payload);
 			assertEquals(written.exit(), 0, written.stderr());
@@ -271,7 +271,9 @@ public class WindowsBootstrapTest{
 	
 	private static final String COMMAND_PREFIX = "powershell -NoProfile -NonInteractive -EncodedCommand ";
 	
-	/** None of the commands built in these tests may need the out-of-band transport. */
+	/**
+	 * None of the commands built in these tests may need the out-of-band transport.
+	 */
 	private static final HostBootstrap.PayloadTransfer NO_TRANSFER = (command, payload) -> fail("Unexpected out-of-band transfer: " + command);
 	
 	private static String decode(String command){
@@ -288,7 +290,7 @@ public class WindowsBootstrapTest{
 		var pwsh = requirePowerShell();
 		var process = new ProcessBuilder(pwsh, "-NoProfile", "-NonInteractive", "-EncodedCommand",
 		                                 Base64.getEncoder().encodeToString(script.getBytes(UTF_16LE)))
-			.start();
+			              .start();
 		try(OutputStream in = process.getOutputStream()){
 			in.write(input);
 		}
@@ -308,8 +310,8 @@ public class WindowsBootstrapTest{
 			for(var candidate : List.of("pwsh", "powershell")){
 				try{
 					var test = new ProcessBuilder(candidate, "-NoProfile", "-NonInteractive", "-Command", "exit 0")
-						.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD)
-						.start();
+						           .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD)
+						           .start();
 					if(test.waitFor(30, TimeUnit.SECONDS)){
 						probedPwsh = candidate;
 						break;

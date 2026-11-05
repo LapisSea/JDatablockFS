@@ -3,7 +3,6 @@ package com.lapissea.fuzz.distributed.bootstrap;
 import org.testng.annotations.Test;
 
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -11,7 +10,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 /**
  * Regression for the sweep window in {@link HelperOps#run}: a session registered there but not yet

@@ -48,7 +48,7 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class GeneralTests{
-
+	
 	private static final Logger log = LoggerFactory.getLogger(GeneralTests.class);
 	@AfterMethod
 	public void cleanup(ITestResult method){ TestUtils.cleanup(method); }

@@ -18,23 +18,23 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class EnumCollectionCodegenTests{
-	public enum Choice{ A, B, C, D, E }
+	public enum Choice{A, B, C, D, E}
 	
 	@StructPipe.Special
 	public static class Collections extends IOInstance.Managed<Collections>{
 		@IOValue @IONullability(IONullability.Mode.NULLABLE)
-		public List<Choice> list;
+		public          List<Choice>      list;
 		@IOValue @IONullability(IONullability.Mode.NULLABLE)
-		public ArrayList<Choice> arrayList;
+		public          ArrayList<Choice> arrayList;
 		@IOValue @IONullability(IONullability.Mode.NULLABLE)
-		public Choice[] array;
-		@IOValue public int trailing;
+		public          Choice[]          array;
+		@IOValue public int               trailing;
 	}
 	
 	@Test
 	public void roundTrip() throws IOException{
-		StructPipe<Collections> pipe = StandardStructPipe.of(Collections.class, StructPipe.STATE_DONE);
-		var unchecked = pipe instanceof CheckedPipe.Standard<Collections> checked? checked.getUncheckedPipe() : pipe;
+		StructPipe<Collections> pipe      = StandardStructPipe.of(Collections.class, StructPipe.STATE_DONE);
+		var                     unchecked = pipe instanceof CheckedPipe.Standard<Collections> checked? checked.getUncheckedPipe() : pipe;
 		assertThat(unchecked).isInstanceOf(StructPipe.SpecializedImplementation.class);
 		for(int count : new int[]{-1, 0, 1, 7, 23, 128}){
 			var value = new Collections();
@@ -62,23 +62,25 @@ public class EnumCollectionCodegenTests{
 	@StructPipe.Special
 	@IOInstance.Order({"list", "array", "trailing"})
 	public interface ConstructorCollections extends IOInstance.Def<ConstructorCollections>{
-		@IONullability(IONullability.Mode.NULLABLE) List<Choice> list();
-		@IONullability(IONullability.Mode.NULLABLE) Choice[] array();
+		@IONullability(IONullability.Mode.NULLABLE)
+		List<Choice> list();
+		@IONullability(IONullability.Mode.NULLABLE)
+		Choice[] array();
 		int trailing();
 	}
-
+	
 	@Test
 	public void readConstructorCollections() throws IOException{
-		var pipe = StandardStructPipe.of(ConstructorCollections.class, StructPipe.STATE_DONE);
+		var pipe      = StandardStructPipe.of(ConstructorCollections.class, StructPipe.STATE_DONE);
 		var unchecked = pipe instanceof CheckedPipe.Standard<ConstructorCollections> checked? checked.getUncheckedPipe() : pipe;
 		assertThat(unchecked).isInstanceOf(StructPipe.SpecializedImplementation.class);
 		var interpreted = new StandardStructPipe<>(Struct.of(ConstructorCollections.class), StructPipe.STATE_DONE);
-		var chunk = AllocateTicket.bytes(16).submit(DataProvider.newVerySimpleProvider());
+		var chunk       = AllocateTicket.bytes(16).submit(DataProvider.newVerySimpleProvider());
 		for(int count : new int[]{-1, 0, 1, 21, 22, 128}){
 			var values = new ArrayList<Choice>();
 			for(int j = 0; j<count; j++) values.add(Choice.values()[j%Choice.values().length]);
 			var value = IOInstance.Def.of(ConstructorCollections.class,
-				count<0? null : values, count<0? null : values.toArray(Choice[]::new), 0x12345678);
+			                              count<0? null : values, count<0? null : values.toArray(Choice[]::new), 0x12345678);
 			interpreted.write(chunk, value);
 			var result = pipe.readNew(chunk, null);
 			assertThat(result.list()).isEqualTo(value.list());
@@ -86,7 +88,7 @@ public class EnumCollectionCodegenTests{
 			assertThat(result.trailing()).isEqualTo(value.trailing());
 		}
 	}
-
+	
 	private static void check(Collections actual, Collections expected){
 		assertThat(actual.list).isEqualTo(expected.list);
 		assertThat(actual.arrayList).isEqualTo(expected.arrayList);

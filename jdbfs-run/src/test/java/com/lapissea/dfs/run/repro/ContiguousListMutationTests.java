@@ -17,14 +17,14 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ContiguousListMutationTests{
-
+	
 	@IOValue
 	public static class Element extends IOInstance.Managed<Element>{
 		private final int value;
 		public Element(int value){ this.value = value; }
-		public int value(){ return value; }
+		public int value()       { return value; }
 	}
-
+	
 	@DataProvider
 	public Object[][] batches(){
 		return new Object[][]{
@@ -36,7 +36,7 @@ public class ContiguousListMutationTests{
 			{List.of()}
 		};
 	}
-
+	
 	@Test(dataProvider = "batches")
 	public void bulkAppendPreservesOrderAndMultiplicity(List<Integer> values) throws IOException{
 		ContiguousIOList<Element> list = Cluster.emptyMem().roots().request("list", ContiguousIOList.class, Element.class);
@@ -48,24 +48,24 @@ public class ContiguousListMutationTests{
 		expected.addAll(List.of(7, 8));
 		assertValues(list, expected);
 	}
-
+	
 	private static void assertValues(ContiguousIOList<Element> list, List<Integer> expected) throws IOException{
 		assertThat(list.size()).isEqualTo(expected.size());
 		assertThat(list.iterator().toList().stream().map(Element::value).toList()).containsExactlyElementsOf(expected);
 	}
-
+	
 	@DataProvider
 	public Object[][] zeroSizeIndices(){
 		return new Object[][]{{0}, {1}, {2}};
 	}
-
+	
 	@Test(dataProvider = "zeroSizeIndices")
 	public void indexedMutationsSupportZeroByteElements(int index) throws IOException{
 		ContiguousIOList<CollectionInfo.NullValue> list = Cluster.emptyMem().roots()
-			.request("list", ContiguousIOList.class, CollectionInfo.NullValue.class);
+		                                                         .request("list", ContiguousIOList.class, CollectionInfo.NullValue.class);
 		assertThat(StandardStructPipe.sizeOfUnknown(list.getDataProvider(), new CollectionInfo.NullValue(), WordSpace.BYTE)).isZero();
 		list.addAll(List.of(new CollectionInfo.NullValue(), new CollectionInfo.NullValue(), new CollectionInfo.NullValue()));
-
+		
 		list.add(index, new CollectionInfo.NullValue());
 		assertThat(list.size()).isEqualTo(4);
 		assertThat(list.iterator().toList()).hasSize(4).doesNotContainNull();

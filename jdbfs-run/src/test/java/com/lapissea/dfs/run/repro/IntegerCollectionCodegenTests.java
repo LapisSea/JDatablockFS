@@ -22,15 +22,15 @@ public class IntegerCollectionCodegenTests{
 	@StructPipe.Special
 	public static class Value extends IOInstance.Managed<Value>{
 		@IONullability(IONullability.Mode.NULLABLE)
-		public Integer[] array;
+		public Integer[]          array;
 		@IONullability(IONullability.Mode.NULLABLE)
-		public int[] primitive;
+		public int[]              primitive;
 		@IONullability(IONullability.Mode.NULLABLE)
-		public List<Integer> list;
+		public List<Integer>      list;
 		public ArrayList<Integer> concrete;
-		public int tail;
+		public int                tail;
 	}
-
+	
 	@StructPipe.Special
 	@IOInstance.Order({"array", "list", "tail"})
 	public interface ConstructorValue extends IOInstance.Def<ConstructorValue>{
@@ -40,7 +40,7 @@ public class IntegerCollectionCodegenTests{
 		List<Integer> list();
 		int tail();
 	}
-
+	
 	@Test
 	public void readConstructorCollections() throws IOException{
 		var pipe = StandardStructPipe.of(ConstructorValue.class, STATE_DONE);
@@ -49,8 +49,8 @@ public class IntegerCollectionCodegenTests{
 		for(var values : List.of(List.<Integer>of(), List.of(0, -1, Integer.MIN_VALUE, Integer.MAX_VALUE))){
 			for(boolean nulls : new boolean[]{false, true}){
 				var value = IOInstance.Def.of(ConstructorValue.class,
-				                             nulls? null : values.toArray(Integer[]::new),
-				                             nulls? null : new ArrayList<>(values), 12345678);
+				                              nulls? null : values.toArray(Integer[]::new),
+				                              nulls? null : new ArrayList<>(values), 12345678);
 				pipe.write(chunk, value);
 				var read = pipe.readNew(chunk, null);
 				assertThat(read.array()).isEqualTo(value.array());
@@ -59,17 +59,17 @@ public class IntegerCollectionCodegenTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void readCollections() throws IOException{
-		var type = Struct.of(Value.class, STATE_DONE);
-		var basic = new StandardStructPipe<>(type, STATE_DONE);
+		var type      = Struct.of(Value.class, STATE_DONE);
+		var basic     = new StandardStructPipe<>(type, STATE_DONE);
 		var generated = StandardStructPipe.of(Value.class, STATE_DONE);
 		assertThat(generated).isInstanceOf(StructPipe.SpecializedImplementation.class);
 		var chunk = AllocateTicket.bytes(32).submit(DataProvider.newVerySimpleProvider());
 		for(var values : List.of(List.<Integer>of(), List.of(0, 0, 0), List.of(-128, 127),
-		                        List.of(-32768, 32767), List.of(-8388608, 8388607),
-		                        List.of(Integer.MIN_VALUE, Integer.MAX_VALUE))){
+		                         List.of(-32768, 32767), List.of(-8388608, 8388607),
+		                         List.of(Integer.MIN_VALUE, Integer.MAX_VALUE))){
 			for(boolean nulls : new boolean[]{false, true}){
 				var value = new Value();
 				value.array = nulls? null : values.toArray(Integer[]::new);
@@ -87,7 +87,7 @@ public class IntegerCollectionCodegenTests{
 			}
 		}
 	}
-
+	
 	private static void assertValue(Value actual, Value expected){
 		assertThat(actual.array).isEqualTo(expected.array);
 		assertThat(actual.primitive).isEqualTo(expected.primitive);

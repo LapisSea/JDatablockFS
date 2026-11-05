@@ -16,13 +16,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class NullableSkipTests{
 	public static class Value extends IOInstance.Managed<Value>{
 		@IOValue @IONullability(IONullability.Mode.NULLABLE)
-		public Double value;
+		public          Double  value;
 		@IOValue public boolean flag;
 	}
 	
 	@Test
 	public void skipNullableBoxedValue() throws IOException{
-		var pipe = new StandardStructPipe<>(Struct.of(Value.class), Struct.STATE_DONE);
+		var pipe     = new StandardStructPipe<>(Struct.of(Value.class), Struct.STATE_DONE);
 		var provider = DataProvider.newVerySimpleProvider();
 		for(Double number : new Double[]{null, 0D, 123456789D}){
 			var value = new Value();

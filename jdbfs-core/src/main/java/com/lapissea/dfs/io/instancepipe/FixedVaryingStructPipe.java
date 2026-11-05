@@ -39,7 +39,7 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		
 		// IDs belong to the enclosing provider, so equal widths at different positions are distinct layouts.
 		private final Map<List<VaryingSize>, FixedVaryingStructPipe<T>> cache     = new HashMap<>();
-		private final ReadWriteClosableLock                            cacheLock = ReadWriteClosableLock.reentrant();
+		private final ReadWriteClosableLock                             cacheLock = ReadWriteClosableLock.reentrant();
 		
 		private ProviderReply(Struct<T> type){
 			this.type = type;
@@ -118,9 +118,9 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	
 	public static final class UseFixed extends Exception{ }
 	
-	private String sizesStr;
+	private       String                      sizesStr;
 	private final PipeFieldCompiler.Result<T> layout;
-
+	
 	public FixedVaryingStructPipe(FixedVaryingStructPipe<T> source, int syncStage){
 		super(source.getType(), (type, fields, testRun) -> {
 			if(testRun) throw new DoNotTest();
@@ -129,7 +129,7 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		layout = source.layout;
 		sizesStr = source.sizesStr;
 	}
-
+	
 	private FixedVaryingStructPipe<T> specialize(){
 		boolean enabled = switch(ConfigDefs.OPTIMIZED_PIPE.resolve()){
 			case NEVER -> false;

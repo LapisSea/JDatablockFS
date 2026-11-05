@@ -9,14 +9,14 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ImmutableCloneTests{
-
+	
 	@IOValue
 	public static class Child extends IOInstance.Managed<Child>{
 		private int value;
-		public Child(){ }
+		public Child()         { }
 		public Child(int value){ this.value = value; }
 	}
-
+	
 	@IOValue
 	@IOInstance.Order({"number", "name", "child"})
 	public static class PublicCtor extends IOInstance.Managed<PublicCtor>{
@@ -29,7 +29,7 @@ public class ImmutableCloneTests{
 			this.child = child;
 		}
 	}
-
+	
 	@IOValue
 	@IOInstance.Order({"number", "child"})
 	public static class PackageCtor extends IOInstance.Managed<PackageCtor>{
@@ -40,7 +40,7 @@ public class ImmutableCloneTests{
 			this.child = child;
 		}
 	}
-
+	
 	@IOValue
 	@IOInstance.Order({"number", "child"})
 	public static class PrivateCtor extends IOInstance.Managed<PrivateCtor>{
@@ -52,23 +52,23 @@ public class ImmutableCloneTests{
 		}
 		static PrivateCtor of(int number, Child child){ return new PrivateCtor(number, child); }
 	}
-
+	
 	@IOInstance.Order({"number", "child"})
 	public interface ReadOnlyDef extends IOInstance.Def<ReadOnlyDef>{
 		int number();
 		Child child();
 	}
-
+	
 	private static <T extends IOInstance<T>> void checkDeepClone(T original, Child originalChild, Class<T> type){
 		var struct = Struct.of(type, Struct.STATE_DONE);
 		assertThat(struct.needsBuilderObj()).as("fixture must be read-only").isTrue();
-
+		
 		var copy = original.clone();
-
+		
 		assertThat(copy).isNotSameAs(original).isEqualTo(original);
 		var copyChild = struct.getFields().requireExact(Child.class, "child").get(null, copy);
 		assertThat(copyChild).isNotSameAs(originalChild).isEqualTo(originalChild);
-
+		
 		var builderName = struct.getConcreteType().getName() + BuilderProxyCompiler.BUILDER_PROXY_POSTFIX;
 		assertThat(builderExists(builderName, struct.getConcreteType().getClassLoader()))
 			.as("clone must not compile a builder").isFalse();
@@ -81,25 +81,25 @@ public class ImmutableCloneTests{
 			return false;
 		}
 	}
-
+	
 	@Test
 	void publicConstructor(){
 		var child = new Child(7);
 		checkDeepClone(new PublicCtor(42, "hello", child), child, PublicCtor.class);
 	}
-
+	
 	@Test
 	void packageConstructor(){
 		var child = new Child(8);
 		checkDeepClone(new PackageCtor(43, child), child, PackageCtor.class);
 	}
-
+	
 	@Test
 	void privateConstructor(){
 		var child = new Child(9);
 		checkDeepClone(PrivateCtor.of(44, child), child, PrivateCtor.class);
 	}
-
+	
 	@IOValue
 	@IOInstance.Order({"number", "child"})
 	public static class DetectionProbe extends IOInstance.Managed<DetectionProbe>{
@@ -110,7 +110,7 @@ public class ImmutableCloneTests{
 			this.child = child;
 		}
 	}
-
+	
 	@Test
 	void builderDetectionWorks(){
 		var struct = Struct.of(DetectionProbe.class, Struct.STATE_DONE);
@@ -120,7 +120,7 @@ public class ImmutableCloneTests{
 		struct.getBuilderObjType(true);
 		assertThat(builderExists(name, loader)).isTrue();
 	}
-
+	
 	@Test
 	void readOnlyDefinition(){
 		var child = new Child(10);

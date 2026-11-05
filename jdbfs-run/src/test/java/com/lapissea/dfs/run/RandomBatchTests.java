@@ -38,8 +38,8 @@ public class RandomBatchTests{
 	
 	private static int iterations(int totalTasks){
 		var scaled = FuzzConfig.iterationMultiplier().orElse(BigDecimal.ONE)
-		                     .multiply(BigDecimal.valueOf(totalTasks), MathContext.DECIMAL64)
-		                     .toBigInteger();
+		                       .multiply(BigDecimal.valueOf(totalTasks), MathContext.DECIMAL64)
+		                       .toBigInteger();
 		return scaled.signum()<1? 1 : scaled.intValueExact();
 	}
 }

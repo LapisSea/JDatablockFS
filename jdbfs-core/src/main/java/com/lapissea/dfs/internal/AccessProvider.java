@@ -160,7 +160,7 @@ public interface AccessProvider{
 			var lookup = getLookup(target, true, true, Mode.PRIVATE, Mode.MODULE);
 			return lookup.defineHiddenClassWithClassData(bytecode, classData, true, MethodHandles.Lookup.ClassOption.NESTMATE).lookupClass();
 		}
-
+		
 		@Override
 		public AccessProvider adapt(Class<?> target, boolean required, Mode... modes) throws IllegalAccessException{
 			var lookup = getLookup(target, true, required, modes);

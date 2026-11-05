@@ -19,7 +19,7 @@ import static com.lapissea.dfs.query.Query.Test.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class QueryTests{
-
+	
 	@IOInstance.Order({"a", "b", "someData"})
 	interface FF extends IOInstance.Def<FF>{
 		static FF of(float a, float b){

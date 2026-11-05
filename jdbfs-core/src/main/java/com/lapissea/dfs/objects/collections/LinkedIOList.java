@@ -304,7 +304,7 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		if(count<0) throw new IllegalArgumentException("Count must be positive!");
 		
 		IONode<T> chainStart = null;
-		IONode<T> prev = null;
+		IONode<T> prev       = null;
 		for(long i = 0; i<count; i++){
 			// Each element must be a distinct instance: create and initialize it per node so the
 			// initializer's effect is not shared across nodes.

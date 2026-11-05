@@ -5,7 +5,6 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.logging.Log.LogLevel;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.compilation.FieldCompiler.AccessType;
-
 import com.lapissea.util.LogUtil;
 
 import java.net.URL;
@@ -107,11 +106,11 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FDur  RUNNER_TASK_CHOKE_TIME      = flagDur("runner.taskChokeTime", () -> Duration.ofMillis(2000/cores())).positive().limitMaxNs(Long.MAX_VALUE);
 	Flag.FDur  RUNNER_WATCHER_TIMEOUT      = flagDur("runner.watcherTimeout", Duration.ofMillis(1000)).positive().limitMaxMs(Integer.MAX_VALUE);
 	
-	Flag.FBool          CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
-	Flag.FBool          CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);
-	Flag.FBool          CLASSGEN_PRINT_GENERATING_INFO = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
-	Flag.FBool          CLASSGEN_PRINT_BYTECODE        = flagB("classGen.printBytecode", CLASSGEN_DEBUG);
-	Flag.FStrOptional   CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
+	Flag.FBool        CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
+	Flag.FBool        CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);
+	Flag.FBool        CLASSGEN_PRINT_GENERATING_INFO = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
+	Flag.FBool        CLASSGEN_PRINT_BYTECODE        = flagB("classGen.printBytecode", CLASSGEN_DEBUG);
+	Flag.FStrOptional CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
 	
 	
 	Flag.FEnum<LZ4Compatibility> LZ4_COMPATIBILITY = flagEV("lz4.compatibility", LZ4Compatibility.ANY);

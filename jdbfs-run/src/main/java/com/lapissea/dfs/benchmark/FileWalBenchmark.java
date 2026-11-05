@@ -14,7 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
-/** End-to-end collection writes, including root commit and automatic checkpoints. */
+/**
+ * End-to-end collection writes, including root commit and automatic checkpoints.
+ */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -23,24 +25,27 @@ import java.util.concurrent.TimeUnit;
 @Fork(2)
 @Threads(1)
 public class FileWalBenchmark{
-	@Param({"false", "true"}) public boolean durable;
-	@Param({"randomAccess", "mapped"}) public String backend;
-	@Param({"1", "32", "256"}) public int batchSize;
-	private Path path;
-	private FileIOData data;
+	@Param({"false", "true"})
+	public  boolean                   durable;
+	@Param({"randomAccess", "mapped"})
+	public  String                    backend;
+	@Param({"1", "32", "256"})
+	public  int                       batchSize;
+	private Path                      path;
+	private FileIOData                data;
 	private ContiguousIOList<Integer> list;
-	private int sequence;
-
+	private int                       sequence;
+	
 	@Setup(Level.Trial)
 	public void setup() throws Exception{
 		path = Files.createTempFile("jdbfs-wal-benchmark", ".db");
 		data = backend.equals("mapped")? new FileMemoryMappedData(path.toFile(), false, durable) :
-		                               new FileRandomAccessData(path.toFile(), false, durable);
+		       new FileRandomAccessData(path.toFile(), false, durable);
 		list = Cluster.initOrOpen(data).roots().request("values", ContiguousIOList.class, Integer.class);
 		data.openIOTransaction(() -> { for(int i = 0; i<4096; i++) list.add(i); });
 		data.checkpoint();
 	}
-
+	
 	@Benchmark
 	public int update() throws Exception{
 		try(var tx = data.startTransaction()){
@@ -52,18 +57,17 @@ public class FileWalBenchmark{
 		}
 		return sequence;
 	}
-
+	
 	@TearDown(Level.Trial)
 	public void cleanup() throws Exception{
-		try{ if(data != null) data.close(); }
-		finally{
+		try{ if(data != null) data.close(); }finally{
 			if(path != null){
 				Files.deleteIfExists(path.resolveSibling(path.getFileName() + ".wal"));
 				Files.deleteIfExists(path);
 			}
 		}
 	}
-
+	
 	public static void main(String[] args) throws Exception{
 		new Runner(new OptionsBuilder().parent(new CommandLineOptions(args)).include(FileWalBenchmark.class.getSimpleName()).build()).run();
 	}

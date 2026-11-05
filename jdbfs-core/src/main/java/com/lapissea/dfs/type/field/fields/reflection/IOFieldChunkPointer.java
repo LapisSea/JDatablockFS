@@ -139,7 +139,7 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 			});
 		});
 	}
-
+	
 	public NumberSize generatedWriteSize(VarPool<T> ioPool, T instance, long value){
 		return getSafeSize(ioPool, instance, value);
 	}
@@ -153,7 +153,7 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 			args.get("ioPool"); accessMap.getObject(args);
 		}).call("skip", args -> args.get("src"));
 	}
-
+	
 	@Override
 	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		accessMap.markTemporary();

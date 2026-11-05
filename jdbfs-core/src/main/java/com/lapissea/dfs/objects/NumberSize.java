@@ -237,7 +237,7 @@ public enum NumberSize{
 			target.bitShiftLeft(shift).bitShiftRight(false, shift);
 		}
 	}
-
+	
 	public int readInt(ContentReader in) throws IOException{
 		return switch(this){
 			case VOID -> 0;
@@ -265,7 +265,7 @@ public enum NumberSize{
 			target.bitShiftLeft(shift).bitShiftRight(false, shift);
 		}
 	}
-
+	
 	public static void readIntDyn(CodeBlock target, boolean signed) throws MalformedJorth{
 		readIntDyn(target, e -> e.get("src"), signed);
 	}

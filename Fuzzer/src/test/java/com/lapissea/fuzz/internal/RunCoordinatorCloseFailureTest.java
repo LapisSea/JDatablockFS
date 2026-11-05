@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.random.RandomGenerator;
 import java.util.stream.Stream;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 /**
  * Regression for a failing {@link RunCoordinator.Workers#close()} (e.g. a distributed helper that did not
@@ -40,24 +40,31 @@ public class RunCoordinatorCloseFailureTest{
 					private boolean done;
 					private int     active;
 					
-					@Override public RunCoordinator.Work claimLocal(){
+					@Override
+					public RunCoordinator.Work claimLocal(){
 						if(done || !source.hasNext()){ return null; }
 						done = true;
 						active++;
 						return new RunCoordinator.Work(1, source.next(), () -> false);
 					}
-					@Override public void progress(RunCoordinator.Work work, FuzzingRunner.SequenceProgress sample){ }
-					@Override public boolean completeLocal(
+					@Override
+					public void progress(RunCoordinator.Work work, FuzzingRunner.SequenceProgress sample){ }
+					@Override
+					public boolean completeLocal(
 						RunCoordinator.Work work, SequenceOutcome<RandomGenerator, Object> outcome, FuzzingRunner.SequenceProgress sample
 					){
 						active--;
 						if(outcome instanceof SequenceOutcome.Failed<RandomGenerator, Object> failed){ context.retainFailure(failed.failure()); }
 						return true;
 					}
-					@Override public void tick(){ }
-					@Override public boolean isComplete(){ return done && active == 0; }
-					@Override public void cancel(){ }
-					@Override public void close(){ throw new IllegalStateException("cleanup boom"); }
+					@Override
+					public void tick(){ }
+					@Override
+					public boolean isComplete(){ return done && active == 0; }
+					@Override
+					public void cancel(){ }
+					@Override
+					public void close(){ throw new IllegalStateException("cleanup boom"); }
 				};
 			}
 		};

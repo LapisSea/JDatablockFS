@@ -97,7 +97,7 @@ public class CacheGateTest{
 	
 	@Test
 	public void fileLockGateExcludesOtherJvmAndRecoversAfterKill() throws Exception{
-		var cache = newCache();
+		var     cache = newCache();
 		Process child = null;
 		try{
 			String cp = Path.of(CacheGateTest.class.getProtectionDomain().getCodeSource().getLocation().toURI()) + File.pathSeparator +

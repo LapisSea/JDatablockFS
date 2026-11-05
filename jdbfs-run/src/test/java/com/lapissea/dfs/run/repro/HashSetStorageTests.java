@@ -15,13 +15,13 @@ public class HashSetStorageTests{
 	public Object[][] removalModes(){
 		return new Object[][]{{false}, {true}};
 	}
-
+	
 	@Test(dataProvider = "removalModes")
 	public void emptyingAndRefillingReclaimsNodeChains(boolean clear) throws IOException{
 		var cluster = Cluster.emptyMem();
-		var set = cluster.roots().<IOSet<Integer>>request(1, IOSet.class, Integer.class);
+		var set     = cluster.roots().<IOSet<Integer>>request(1, IOSet.class, Integer.class);
 		cluster.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
-
+		
 		for(int cycle = 0; cycle<3; cycle++){
 			int first = cycle*64;
 			for(int i = first; i<first + 64; i++){

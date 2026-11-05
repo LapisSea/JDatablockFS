@@ -30,7 +30,7 @@ public class JorthInstructionLineTests{
 		}, 0);
 		return lines;
 	}
-
+	
 	@Test
 	public void numbersHighLevelInstructionsAndResetsPerMethod() throws Exception{
 		var cd = new ClassDefinition(null).name(ClassName.dotted("test.InstructionLines"));
@@ -44,10 +44,10 @@ public class JorthInstructionLineTests{
 		assertThat(lines(bytes, "<init>")).containsExactly(1, 2, 3, 4);
 		assertThat(lines(cd.getClassFile(), "add")).containsExactly(1, 2, 3);
 	}
-
+	
 	@Test
 	public void nestedAndLazyBlocksShareNumbering() throws Exception{
-		var cd = new ClassDefinition(null).name(ClassName.dotted("test.NestedInstructionLines"));
+		var cd   = new ClassDefinition(null).name(ClassName.dotted("test.NestedInstructionLines"));
 		var body = cd.function("run").staticAcc().body();
 		body.val(true).ifTrue(c -> c.val(1).pop()).elseRun(c -> c.val(2).pop());
 		body.scope(c -> c.val(3).pop());
@@ -60,7 +60,7 @@ public class JorthInstructionLineTests{
 		}.load();
 		cls.getMethod("run").invoke(null);
 	}
-
+	
 	@Test
 	public void runtimeFailureReportsInstructionNumber() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple("test.FailingInstructionLine", cd -> {

@@ -1,8 +1,7 @@
 package com.lapissea.dfs.type.string;
 
 /**
- * Guards the recursive stringification walk against cyclic object graphs and pathologically deep nesting.
- * Recursion stops expanding once {@link #MAX_DEPTH} is reached.
+ * Guards toString against cyclic object graphs and very deep nesting
  */
 public final class StringifyState{
 	
@@ -12,7 +11,6 @@ public final class StringifyState{
 	
 	private StringifyState(){ }
 	
-	/** @return false when the depth budget is exhausted, in which case {@link #exit} must not be called */
 	public static boolean enter(){
 		var depth = DEPTH.get();
 		if(depth[0]>=MAX_DEPTH) return false;

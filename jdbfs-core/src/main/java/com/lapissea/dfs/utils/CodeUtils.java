@@ -7,16 +7,16 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.GenericContext;
-import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.DynamicSupport;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicReferenceObject;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicReferenceObject;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
 import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
@@ -43,11 +43,11 @@ public interface CodeUtils{
 	static long writeIntegrityBits(long raw, int oneBits, int usedBits){
 		return BitFieldMerger.calcIntegrityBits(raw, oneBits, usedBits);
 	}
-
+	
 	static Object dynamic_readReference(IOField<?, ?> caller, int typeID, Reference reference, DataProvider provider, GenericContext genericContext) throws IOException{
 		return ((IOFieldDynamicReferenceObject<?, ?>)caller).readReferencedValue(provider, typeID, reference, genericContext);
 	}
-
+	
 	static Object unmanaged_readValue(IOField<?, ?> caller, ChunkPointer pointer, DataProvider provider, GenericContext genericContext) throws IOException{
 		if(pointer.isNull()) return null;
 		return ((IOFieldUnmanagedObjectReference<?, ?>)caller).makeValueObject(provider, pointer.dereference(provider), genericContext);

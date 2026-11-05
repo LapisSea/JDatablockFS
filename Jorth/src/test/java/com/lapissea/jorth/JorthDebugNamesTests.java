@@ -72,14 +72,14 @@ public class JorthDebugNamesTests{
 	
 	@Test
 	public void localScopesSurviveSlotReuseAndLazyBlocks() throws Exception{
-		var cd = new ClassDefinition(null).name(ClassName.dotted("test.DebugLocals"));
+		var cd   = new ClassDefinition(null).name(ClassName.dotted("test.DebugLocals"));
 		var body = cd.function("run").arg(long.class, "count").body();
 		body.val(1L).setIntoNewVar("first").get("first").pop().forgetVar("first");
 		body.scope(c -> c.val(2.0).setIntoNewVar("nested").get("nested").pop());
 		body.lazyBlock(c -> c.val("lazy").setIntoNewVar("deferred").get("deferred").pop());
 		body.var(GenericType.of(List.class).withArgs(String.class), "last").nullVal(List.class).set("last");
 		body.get("last").pop();
-		var bytes = cd.getClassFile();
+		var bytes  = cd.getClassFile();
 		var locals = locals(bytes, "run");
 		assertThat(locals).extracting(Local::name).containsExactlyInAnyOrder("this", "count", "first", "nested", "deferred", "last");
 		var ordered = List.of("first", "nested", "deferred", "last").stream()

@@ -277,7 +277,7 @@ public class WalFaultInjectionTests{
 			// Open a new IO/provider against only persisted bytes, including real WAL replay.
 			var recoveredController = new Controller(main, wal, seed);
 			try(var source = new FaultIO(name, recoveredController, false)){
-				ContiguousIOList<Integer> list = Cluster.initOrOpen(source).roots().request("values", ContiguousIOList.class, Integer.class);
+				ContiguousIOList<Integer> list   = Cluster.initOrOpen(source).roots().request("values", ContiguousIOList.class, Integer.class);
 				var                       actual = new ArrayList<Integer>();
 				for(int i = 0; i<list.size(); i++) actual.add(list.get(i));
 				assertThat(actual.equals(acknowledged) || actual.equals(inFlight))

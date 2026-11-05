@@ -28,10 +28,10 @@ public class PipeReferenceFieldCodegenTests{
 	public static class Child extends IOInstance.Managed<Child>{
 		@IODependency.VirtualNumSize
 		private long value;
-		public Child(){ }
+		public Child()          { }
 		public Child(long value){ this.value = value; }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class References extends IOInstance.Managed<References>{
@@ -42,10 +42,10 @@ public class PipeReferenceFieldCodegenTests{
 		@IOValue.Reference
 		@IONullability(IONullability.Mode.NULLABLE)
 		private Child nullable;
-		private byte tail;
+		private byte  tail;
 		public References(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class DefaultReference extends IOInstance.Managed<DefaultReference>{
@@ -54,7 +54,7 @@ public class PipeReferenceFieldCodegenTests{
 		private Child defaulted;
 		public DefaultReference(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	@IOInstance.Order({"child", "nullable", "tail", "child:ref", "nullable:ref"})
@@ -64,7 +64,7 @@ public class PipeReferenceFieldCodegenTests{
 		@IOValue.Reference
 		@IONullability(IONullability.Mode.NULLABLE)
 		private Child nullable;
-		private byte tail;
+		private byte  tail;
 		public ConstructorReferences(){ }
 		public ConstructorReferences(Child child, Child nullable, byte tail){
 			this.child = child;
@@ -75,15 +75,15 @@ public class PipeReferenceFieldCodegenTests{
 			this(child, nullable, tail);
 		}
 	}
-
+	
 	@Test
 	public void constructorReadersPreserveReferenceMetadataForReserialization() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
 				var pipe = StandardStructPipe.of(ConstructorReferences.class, StagedInit.STATE_DONE);
 				assertGenerated(pipe);
-				var provider = DataProvider.newVerySimpleProvider();
-				var chunk = AllocateTicket.bytes(128).submit(provider);
+				var provider  = DataProvider.newVerySimpleProvider();
+				var chunk     = AllocateTicket.bytes(128).submit(provider);
 				var rewritten = AllocateTicket.bytes(128).submit(provider);
 				for(boolean nullChild : new boolean[]{false, true}){
 					var value = new ConstructorReferences(new Child(5_000_000_000L), nullChild? null : new Child(-300), (byte)98);
@@ -102,60 +102,62 @@ public class PipeReferenceFieldCodegenTests{
 			}
 		}
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class Strings extends IOInstance.Managed<Strings>{
-		private String[] array;
-		private List<String> list;
+		private String[]          array;
+		private List<String>      list;
 		private ArrayList<String> arrayList;
 		@IONullability(IONullability.Mode.NULLABLE)
-		private String[] nullable;
-		private byte tail;
+		private String[]          nullable;
+		private byte              tail;
 		public Strings(){ }
 	}
-
+	
 	public abstract static sealed class SealedChild extends IOInstance.Managed<SealedChild> permits First, Second{ }
+	
 	public static final class First extends SealedChild{
 		@IOValue private int value;
-		public First(){ }
+		public First()         { }
 		public First(int value){ this.value = value; }
 	}
+	
 	public static final class Second extends SealedChild{
 		@IOValue private long value;
-		public Second(){ }
+		public Second()          { }
 		public Second(long value){ this.value = value; }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class ObjectCollections extends IOInstance.Managed<ObjectCollections>{
-		private Child[] array;
+		private Child[]     array;
 		private List<Child> list;
 		@IOValue.Reference
-		private Child[] referencedArray;
+		private Child[]     referencedArray;
 		@IOValue.Reference
 		private List<Child> referencedList;
 		@IOValue.Reference
 		@IONullability(IONullability.Mode.NULLABLE)
-		private Child[] nullableReference;
+		private Child[]     nullableReference;
 		@IONullability(IONullability.Mode.NULLABLE)
-		private Child[] nullable;
-		private byte tail;
+		private Child[]     nullable;
+		private byte        tail;
 		public ObjectCollections(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class SealedObjects extends IOInstance.Managed<SealedObjects>{
-		private SealedChild child;
+		private SealedChild       child;
 		@IONullability(IONullability.Mode.NULLABLE)
-		private SealedChild nullable;
+		private SealedChild       nullable;
 		private List<SealedChild> list;
-		private byte tail;
+		private byte              tail;
 		public SealedObjects(){ }
 	}
-
+	
 	@Test
 	public void generatedObjectCollectionReadersPreserveChildValues() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -186,7 +188,7 @@ public class PipeReferenceFieldCodegenTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedSealedReadersSelectActualChildPipe() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -211,7 +213,7 @@ public class PipeReferenceFieldCodegenTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedReferenceReadersUseConfiguredChildPipes() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -219,7 +221,7 @@ public class PipeReferenceFieldCodegenTests{
 				var pipe = StandardStructPipe.of(References.class, StagedInit.STATE_DONE);
 				assertGenerated(pipe);
 				var provider = DataProvider.newVerySimpleProvider();
-				var chunk = AllocateTicket.bytes(128).submit(provider);
+				var chunk    = AllocateTicket.bytes(128).submit(provider);
 				for(boolean nullChild : new boolean[]{false, true}){
 					var value = new References();
 					value.flexible = new Child(-300);
@@ -238,7 +240,7 @@ public class PipeReferenceFieldCodegenTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedDefaultReferenceReadersMakeChildForNullPointer() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -258,7 +260,7 @@ public class PipeReferenceFieldCodegenTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedStringCollectionReadersKeepLengthsAndNulls() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -285,14 +287,14 @@ public class PipeReferenceFieldCodegenTests{
 			}
 		}
 	}
-
+	
 	private static <T extends IOInstance<T>> T readInto(StructPipe<T> pipe, Chunk chunk, T value) throws IOException{
 		try(var io = chunk.io()){
 			pipe.read(chunk.getDataProvider(), io, value, null);
 		}
 		return value;
 	}
-
+	
 	private static void assertGenerated(StructPipe<?> pipe){
 		if(pipe instanceof CheckedPipe.Standard<?> checked) pipe = checked.getUncheckedPipe();
 		assertThat(pipe).isInstanceOf(StructPipe.SpecializedImplementation.class);

@@ -509,7 +509,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	public boolean needsIOPool(){
 		return Iters.from(group).anyMatch(IOField::needsIOPool);
 	}
-
+	
 	public Optional<BitLayout> getSafetyBits(){
 		return safetyBits;
 	}

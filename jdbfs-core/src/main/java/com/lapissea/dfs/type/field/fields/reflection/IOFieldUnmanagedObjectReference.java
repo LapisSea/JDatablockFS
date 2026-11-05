@@ -176,7 +176,7 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		ptrPipe.skip(provider, src, null);
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		accessMap.set(getAccessor(), body, value -> {

@@ -106,9 +106,9 @@ public class SshWorkerLauncherTest{
 	@Test(timeOut = 60000)
 	public void javaInvocationJoinsRemotePathsPerHostOs() throws Exception{
 		try(var bundle = RuntimeBundle.capture()){
-			var linux   = new RemoteConfig.Host(null, "user@helper", null, null, 0, 0, 0, null, null);
-			var windows = new RemoteConfig.Host(null, "user@helper", null, null, 0, 0, 0, null, "windows");
-			var linuxCp = SshWorkerLauncher.javaInvocation(linux, HostOs.LINUX, bundle, "/cache", "com.example.Helper", List.of());
+			var linux      = new RemoteConfig.Host(null, "user@helper", null, null, 0, 0, 0, null, null);
+			var windows    = new RemoteConfig.Host(null, "user@helper", null, null, 0, 0, 0, null, "windows");
+			var linuxCp    = SshWorkerLauncher.javaInvocation(linux, HostOs.LINUX, bundle, "/cache", "com.example.Helper", List.of());
 			var linuxEntry = linuxCp.get(linuxCp.indexOf("-cp") + 1);
 			assertFalse(linuxEntry.contains(";"), linuxEntry);
 			for(var part : linuxEntry.split(":")){
@@ -246,7 +246,7 @@ public class SshWorkerLauncherTest{
 			var archive = dir.resolve("bundle.tar");
 			try(var out = Files.newOutputStream(archive)){
 				TarIO.write(out,
-				                           List.of(new RuntimeBundle.Artifact("hash/a.jar", shortFile), new RuntimeBundle.Artifact(name, longFile)));
+				            List.of(new RuntimeBundle.Artifact("hash/a.jar", shortFile), new RuntimeBundle.Artifact(name, longFile)));
 			}
 			
 			var destination = Files.createDirectory(dir.resolve("extracted"));

@@ -11,13 +11,13 @@ import com.lapissea.dfs.io.IOTransactionState;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
+import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.BaseFixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.CheckedPipe;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.type.IOInstance;
@@ -41,13 +41,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class GeneratedWriteSkipTests{
 	private static final int SENTINEL = 0x12345678;
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class Child extends IOInstance.Managed<Child>{
 		private static boolean forbidConstruction;
 		@IODependency.VirtualNumSize
-		private long value;
+		private        long    value;
 		public Child(){
 			if(forbidConstruction) throw new AssertionError("Skip decoded an irrelevant child");
 		}
@@ -56,39 +56,40 @@ public class GeneratedWriteSkipTests{
 			this.value = value;
 		}
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class Numbers extends IOInstance.Managed<Numbers>{
 		@IODependency.VirtualNumSize
 		private long number;
-		private int count;
+		private int  count;
 		private byte tail;
 		public Numbers(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	@IOInstance.Order({"left", "right", "tail"})
 	public static class Nested extends IOInstance.Managed<Nested>{
 		private Child left;
 		private Child right;
-		private byte tail;
+		private byte  tail;
 		public Nested(){ }
 	}
-
+	
 	@StructPipe.Special
 	public static class GetterValue extends IOInstance.Managed<GetterValue>{
-		private static int getterCalls;
+		private static   int getterCalls;
 		@IOValue private int value;
-		public GetterValue(){ }
+		public GetterValue()         { }
 		public GetterValue(int value){ this.value = value; }
-		@IOValue public int getValue(){
+		@IOValue
+		public int getValue(){
 			getterCalls++;
 			return value;
 		}
 	}
-
+	
 	@StructPipe.Special
 	@IOInstance.Order({"number", "child", "tail"})
 	public interface Definition extends IOInstance.Def<Definition>{
@@ -96,66 +97,67 @@ public class GeneratedWriteSkipTests{
 		Child child();
 		byte tail();
 	}
-
+	
 	@StructPipe.Special
 	public interface MutableDefinition extends IOInstance.Def<MutableDefinition>{
-		@IODependency.VirtualNumSize long number();
+		@IODependency.VirtualNumSize
+		long number();
 		void number(long value);
 		int count();
 		void count(int value);
 		byte tail();
 		void tail(byte value);
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class NullableOptional extends IOInstance.Managed<NullableOptional>{
-		private Optional<Integer> number = Optional.empty();
-		private Optional<Child> optionalChild = Optional.empty();
+		private Optional<Integer> number        = Optional.empty();
+		private Optional<Child>   optionalChild = Optional.empty();
 		@IONullability(IONullability.Mode.NULLABLE)
-		private Child nullable;
-		private byte tail;
+		private Child             nullable;
+		private byte              tail;
 		public NullableOptional(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class Defaulted extends IOInstance.Managed<Defaulted>{
 		@IONullability(IONullability.Mode.DEFAULT_IF_NULL)
 		private Child child;
-		private byte tail;
+		private byte  tail;
 		public Defaulted(){ }
 	}
-
-	public enum Choice{ A, B, C, D, E }
-
+	
+	public enum Choice{A, B, C, D, E}
+	
 	@IOValue
 	@StructPipe.Special
 	public static class SkipArrays extends IOInstance.Managed<SkipArrays>{
 		@IONullability(IONullability.Mode.NULLABLE) private boolean[] flags;
-		@IONullability(IONullability.Mode.NULLABLE) private byte[] bytes;
-		@IONullability(IONullability.Mode.NULLABLE) private float[] floats;
-		@IONullability(IONullability.Mode.NULLABLE) private int[] integers;
-		@IONullability(IONullability.Mode.NULLABLE) private Choice[] choices;
-		private byte tail;
+		@IONullability(IONullability.Mode.NULLABLE) private byte[]    bytes;
+		@IONullability(IONullability.Mode.NULLABLE) private float[]   floats;
+		@IONullability(IONullability.Mode.NULLABLE) private int[]     integers;
+		@IONullability(IONullability.Mode.NULLABLE) private Choice[]  choices;
+		private                                             byte      tail;
 		public SkipArrays(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class Collections extends IOInstance.Managed<Collections>{
-		private Integer[] integers;
-		private List<Integer> integerList;
-		private Choice[] choices;
-		private List<Choice> choiceList;
-		private Child[] children;
-		private List<Child> childList;
-		private String[] strings;
+		private Integer[]         integers;
+		private List<Integer>     integerList;
+		private Choice[]          choices;
+		private List<Choice>      choiceList;
+		private Child[]           children;
+		private List<Child>       childList;
+		private String[]          strings;
 		private ArrayList<String> stringList;
-		private byte tail;
+		private byte              tail;
 		public Collections(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class References extends IOInstance.Managed<References>{
@@ -163,44 +165,50 @@ public class GeneratedWriteSkipTests{
 		@IOValue.Generic
 		@IOValue.Reference
 		@IONullability(IONullability.Mode.NULLABLE)
-		private Object dynamic;
+		private Object                    dynamic;
 		@IOValue.Reference
 		@IONullability(IONullability.Mode.NULLABLE)
-		private Child child;
-		private byte tail;
+		private Child                     child;
+		private byte                      tail;
 		public References(){ }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class FailingReference extends IOInstance.Managed<FailingReference>{
 		@IOValue.Reference private Child child;
 		public FailingReference(){ }
 	}
-
+	
 	@Test
 	public void generatedWriterPreservesFieldDiagnosticsOnIOException() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
 				var pipe = StandardStructPipe.of(FailingReference.class, StagedInit.STATE_DONE);
 				assertGeneratedHooks(pipe);
-				var basic = interpreted(pipe);
+				var basic   = interpreted(pipe);
 				var failure = new AtomicReference<IOException>();
-				var memory = MemoryData.empty();
+				var memory  = MemoryData.empty();
 				var source = new IOInterface(){
-					@Override public boolean isReadOnly(){ return false; }
-					@Override public IOTransaction startTransaction(){ return memory.startTransaction(); }
-					@Override public IOTransactionState.Access lockIO(){ return memory.lockIO(); }
-					@Override public UnmanagedRegistry getUnmanagedRegistry(){ return memory.getUnmanagedRegistry(); }
-					@Override public UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){ return memory.claimUnmanagedRegistry(readOnly); }
-					@Override public RandomIO io() throws IOException{
+					@Override
+					public boolean isReadOnly(){ return false; }
+					@Override
+					public IOTransaction startTransaction(){ return memory.startTransaction(); }
+					@Override
+					public IOTransactionState.Access lockIO(){ return memory.lockIO(); }
+					@Override
+					public UnmanagedRegistry getUnmanagedRegistry(){ return memory.getUnmanagedRegistry(); }
+					@Override
+					public UnmanagedRegistry claimUnmanagedRegistry(boolean readOnly){ return memory.claimUnmanagedRegistry(readOnly); }
+					@Override
+					public RandomIO io() throws IOException{
 						var error = failure.get();
 						if(error != null) throw error;
 						return memory.io();
 					}
 				};
 				var provider = Cluster.init(source);
-				var value = new FailingReference();
+				var value    = new FailingReference();
 				value.child = new Child(-300);
 				// Allocate the child reference before enabling failures, keeping generators out of the failure path.
 				basic.write(provider, new ContentOutputBuilder(), value);
@@ -222,15 +230,15 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedWritersMatchPrimitiveBytesAcrossPipeLayouts() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
-				var struct = Struct.of(Numbers.class, StagedInit.STATE_DONE);
+				var struct  = Struct.of(Numbers.class, StagedInit.STATE_DONE);
 				var varying = FixedVaryingStructPipe.tryVarying(struct, VaryingSize.Provider.constLimit(NumberSize.INT, 0));
 				for(var pipe : List.<StructPipe<Numbers>>of(StandardStructPipe.of(Numbers.class, StagedInit.STATE_DONE),
-					FixedStructPipe.of(Numbers.class, StagedInit.STATE_DONE), varying)){
+				                                            FixedStructPipe.of(Numbers.class, StagedInit.STATE_DONE), varying)){
 					for(long number : new long[]{0, -300, Integer.MIN_VALUE, Integer.MAX_VALUE}){
 						var value = new Numbers();
 						value.number = number;
@@ -246,13 +254,13 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedWritersKeepDistinctNestedWidthsAndReportTooSmall() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
 				var pipe = FixedVaryingStructPipe.tryVarying(Struct.of(Nested.class),
-					VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.BYTE)));
+				                                             VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.BYTE)));
 				var basic = interpreted(pipe);
 				var value = new Nested();
 				value.left = new Child(-100);
@@ -275,7 +283,7 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedWritersUseMutableAndDefinitionGetters() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -283,12 +291,12 @@ public class GeneratedWriteSkipTests{
 				var getterPipe = StandardStructPipe.of(GetterValue.class, StagedInit.STATE_DONE);
 				GetterValue.getterCalls = 0;
 				assertParityAndSkip(getterPipe, interpreted(getterPipe), DataProvider.newVerySimpleProvider(),
-					new GetterValue(-300), actual -> assertThat(actual.value).isEqualTo(-300));
+				                    new GetterValue(-300), actual -> assertThat(actual.value).isEqualTo(-300));
 				assertThat(GetterValue.getterCalls).isGreaterThanOrEqualTo(2);
 				var definitionPipe = StandardStructPipe.of(Definition.class, StagedInit.STATE_DONE);
 				for(boolean present : new boolean[]{false, true}){
 					var number = present? Optional.of(-300) : Optional.<Integer>empty();
-					var value = IOInstance.Def.of(Definition.class, number, new Child(70_000), (byte)93);
+					var value  = IOInstance.Def.of(Definition.class, number, new Child(70_000), (byte)93);
 					assertParityAndSkip(definitionPipe, interpreted(definitionPipe), DataProvider.newVerySimpleProvider(), value, actual -> {
 						assertThat(actual.number()).isEqualTo(number);
 						assertThat(actual.child().value).isEqualTo(70_000);
@@ -298,19 +306,19 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedMutableDefinitionsWithoutDataConstructorRoundTrip() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
-				var type = Struct.of(MutableDefinition.class, StagedInit.STATE_DONE);
+				var type    = Struct.of(MutableDefinition.class, StagedInit.STATE_DONE);
 				var varying = FixedVaryingStructPipe.tryVarying(type, VaryingSize.Provider.constLimit(NumberSize.INT, 0));
-				var value = IOInstance.Def.of(MutableDefinition.class);
+				var value   = IOInstance.Def.of(MutableDefinition.class);
 				value.number(-70_000);
 				value.count(300);
 				value.tail((byte)91);
 				for(var pipe : List.<StructPipe<MutableDefinition>>of(StandardStructPipe.of(type, StagedInit.STATE_DONE),
-					FixedStructPipe.of(type, StagedInit.STATE_DONE), varying)){
+				                                                      FixedStructPipe.of(type, StagedInit.STATE_DONE), varying)){
 					assertParityAndSkip(pipe, interpreted(pipe), DataProvider.newVerySimpleProvider(), value, actual -> {
 						assertThat(actual.number()).isEqualTo(value.number());
 						assertThat(actual.count()).isEqualTo(value.count());
@@ -320,7 +328,7 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedWritersPreserveOptionalNullableAndDefaultValues() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -352,7 +360,7 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedCollectionWritersMatchBytesAndSkipWithoutDecodingChildren() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -384,13 +392,13 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedArraySkipsRoundUpPartialBytes() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
-				var pipe = StandardStructPipe.of(SkipArrays.class, StagedInit.STATE_DONE);
-				var basic = interpreted(pipe);
+				var pipe     = StandardStructPipe.of(SkipArrays.class, StagedInit.STATE_DONE);
+				var basic    = interpreted(pipe);
 				var provider = DataProvider.newVerySimpleProvider();
 				for(int length : new int[]{-1, 0, 1, 2, 3, 7, 8, 9, 15, 16, 17}){
 					var value = new SkipArrays();
@@ -421,14 +429,14 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedReferenceWritersKeepMetadataAndSkipPayloads() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
-				var pipe = StandardStructPipe.of(References.class, StagedInit.STATE_DONE);
-				var cluster = Cluster.emptyMem();
-				ContiguousIOList<Integer> list = cluster.roots().request("writerList", ContiguousIOList.class, Integer.class);
+				var                       pipe    = StandardStructPipe.of(References.class, StagedInit.STATE_DONE);
+				var                       cluster = Cluster.emptyMem();
+				ContiguousIOList<Integer> list    = cluster.roots().request("writerList", ContiguousIOList.class, Integer.class);
 				list.addAll(List.of(-300, 70_000));
 				for(Object dynamic : new Object[]{null, "dynamic", new Child(5_000_000_000L)}){
 					var value = new References();
@@ -447,15 +455,17 @@ public class GeneratedWriteSkipTests{
 			}
 		}
 	}
-
+	
 	@FunctionalInterface
-	private interface Check<T>{ void check(T value) throws IOException; }
-
+	private interface Check<T>{
+		void check(T value) throws IOException;
+	}
+	
 	private static <T extends IOInstance<T>> void assertParityAndSkip(StructPipe<T> generated, StructPipe<T> basic,
-	                                                                 DataProvider provider, T value, Check<T> check) throws IOException{
+	                                                                  DataProvider provider, T value, Check<T> check) throws IOException{
 		assertGeneratedHooks(generated);
 		var expected = new ContentOutputBuilder();
-		var actual = new ContentOutputBuilder();
+		var actual   = new ContentOutputBuilder();
 		basic.write(provider, expected, value);
 		generated.write(provider, actual, value);
 		assertThat(actual.toByteArray()).containsExactly(expected.toByteArray());
@@ -472,7 +482,7 @@ public class GeneratedWriteSkipTests{
 			Child.forbidConstruction = false;
 		}
 	}
-
+	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> StructPipe<T> interpreted(StructPipe<T> generated){
 		var raw = unwrap(generated);
@@ -482,13 +492,13 @@ public class GeneratedWriteSkipTests{
 		if(raw instanceof FixedStructPipe<?>) return new FixedStructPipe<>(generated.getType(), StagedInit.STATE_DONE);
 		return new StandardStructPipe<>(generated.getType(), StagedInit.STATE_DONE);
 	}
-
+	
 	private static StructPipe<?> unwrap(StructPipe<?> pipe){
 		if(pipe instanceof CheckedPipe.Standard<?> checked) pipe = checked.getUncheckedPipe();
 		if(pipe instanceof CheckedPipe.Fixed<?> checked) pipe = checked.getUncheckedPipe();
 		return pipe;
 	}
-
+	
 	private static void assertGeneratedHooks(StructPipe<?> pipe){
 		pipe = unwrap(pipe);
 		assertThat(pipe).isInstanceOf(StructPipe.SpecializedImplementation.class);

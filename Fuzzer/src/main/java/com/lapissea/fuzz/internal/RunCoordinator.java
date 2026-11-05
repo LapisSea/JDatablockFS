@@ -228,11 +228,11 @@ public final class RunCoordinator{
 			});
 		}
 		
-		int             threads  = counted? (int)Math.min(count, config.maxWorkers()) : config.maxWorkers();
-		ExecutorService pool     = null;
-		Workers<S, A>   workers  = null;
-		boolean         complete = false;
-		List<FuzzFail<S, A>> results = null;
+		int                  threads  = counted? (int)Math.min(count, config.maxWorkers()) : config.maxWorkers();
+		ExecutorService      pool     = null;
+		Workers<S, A>        workers  = null;
+		boolean              complete = false;
+		List<FuzzFail<S, A>> results;
 		
 		try(Stream<FuzzSequence> source = sequences.all()){
 			Iterator<FuzzSequence> iterator = source.filter(sequence -> runner.shouldRunSequence(sequence, mark)).iterator();
@@ -255,54 +255,63 @@ public final class RunCoordinator{
 					if(outcome instanceof SequenceOutcome.Failed<S, A> failure){ context.retainFailure(failure.failure()); }
 				}
 				complete = true;
-				results = context.results();
 			}else{
-			
-			pool = Executors.newFixedThreadPool(threads, Thread.ofPlatform()
-			                                                   .name("fuzzWorker(" + config.name().orElse("unnamed") + ")-", 0)
-			                                                   .factory());
-			int[] active = {0};
-			while(true){
-				if(Thread.currentThread().isInterrupted()){ throw new CancellationException("Master cancelled"); }
-				workers.tick();
 				
-				if(!context.cancelled && context.deadlineReached()){
-					context.cancelled = true;
-					progress.err();
-					workers.cancel();
-					pool.shutdownNow();
-				}
+				pool = Executors.newFixedThreadPool(
+					threads,
+					Thread.ofPlatform()
+					      .name("fuzzWorker(" + config.name().orElse("unnamed") + ")-", 0)
+					      .factory()
+				);
 				
-				while(!context.cancelled && active[0]<threads){
-					var work = workers.claimLocal();
-					if(work == null){ break; }
-					active[0]++;
-					pool.submit(() -> {
-						try{
-							var outcome = execute(runner, mark, context, activeWorkers, work);
-							context.events.add(() -> {
-								active[0]--;
-								if(activeWorkers.completeLocal(work, outcome, work.last) && outcome instanceof SequenceOutcome.Failed<S, A> failure){
-									context.retainFailure(failure.failure());
-								}
-							});
-						}catch(Throwable e){
-							context.events.add(() -> { throw new IllegalStateException("Local fuzz worker failed", e); });
-						}
-					});
+				int[] active = {0};
+				while(true){
+					if(Thread.currentThread().isInterrupted()){
+						throw new CancellationException("Master cancelled");
+					}
+					
+					workers.tick();
+					
+					if(!context.cancelled && context.deadlineReached()){
+						context.cancelled = true;
+						progress.err();
+						workers.cancel();
+						pool.shutdownNow();
+					}
+					
+					while(!context.cancelled && active[0]<threads){
+						var work = workers.claimLocal();
+						if(work == null) break;
+						active[0]++;
+						
+						pool.submit(() -> {
+							try{
+								var outcome = execute(runner, mark, context, activeWorkers, work);
+								context.events.add(() -> {
+									active[0]--;
+									if(activeWorkers.completeLocal(work, outcome, work.last) &&
+									   outcome instanceof SequenceOutcome.Failed<S, A>(var failure)){
+										context.retainFailure(failure);
+									}
+								});
+							}catch(Throwable e){
+								context.events.add(() -> { throw new IllegalStateException("Local fuzz worker failed", e); });
+							}
+						});
+					}
+					
+					if(workers.isComplete()){
+						complete = !context.cancelled;
+						break;
+					}
+					
+					progress.tick();
+					
+					Runnable event = context.events.poll(context.waitNanos(), TimeUnit.NANOSECONDS);
+					if(event != null) event.run();
 				}
-				
-				if(workers.isComplete()){
-					complete = !context.cancelled;
-					break;
-				}
-				progress.tick();
-				Runnable event = context.events.poll(context.waitNanos(), TimeUnit.NANOSECONDS);
-				if(event != null) event.run();
 			}
-			
 			results = context.results();
-			}
 		}catch(InterruptedException e){
 			Thread.currentThread().interrupt();
 			throw new CancellationException("Master cancelled");

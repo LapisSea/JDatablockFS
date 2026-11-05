@@ -63,8 +63,8 @@ public class HelperOpsTest{
 			var file      = Files.writeString(directory.resolve("user-file.jar"), "user");
 			assertThrows(IOException.class, () -> {
 				             HelperOps.prepare(new HelperProtocol.Install(
-						             cache.toString(), root.resolve("runs").toString(), UUID.randomUUID(),
-						             List.of("c".repeat(64) + "/dependency.jar")));
+					             cache.toString(), root.resolve("runs").toString(), UUID.randomUUID(),
+					             List.of("c".repeat(64) + "/dependency.jar")));
 			             }
 			);
 			assertEquals(Files.readString(file), "user");
@@ -148,7 +148,7 @@ public class HelperOpsTest{
 			var cache  = Files.createDirectory(root.resolve("cache"));
 			var source = Files.writeString(root.resolve("input.jar"), "actual");
 			// The name claims one content, the tar carries another
-			var name   = sha256("expected") + "/dependency.jar";
+			var name    = sha256("expected") + "/dependency.jar";
 			var archive = new ByteArrayOutputStream();
 			TarIO.write(archive, List.of(new RuntimeBundle.Artifact(name, source)));
 			

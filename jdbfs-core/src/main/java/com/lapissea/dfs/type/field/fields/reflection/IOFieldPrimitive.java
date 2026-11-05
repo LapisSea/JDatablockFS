@@ -36,8 +36,8 @@ import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match.Some;
-import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -1541,8 +1541,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public final void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
 		std.readField(body, accessMap);
 	}
-
-	/** The generated writer uses the same size guard as the interpreted writer. */
+	
 	public final NumberSize generatedWriteSize(VarPool<T> ioPool, T instance, NumberSize needed){
 		return getSafeSize(ioPool, instance, needed);
 	}
@@ -1556,7 +1555,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			args.get("ioPool"); accessMap.getObject(args);
 		}).call("skip", args -> args.get("src"));
 	}
-
+	
 	private void injectWriteSize(CodeBlock body, AccessMap accessMap, CodeArg needed) throws MalformedJorth{
 		body.call(CodeUtils.class, "primitive_writeSize", args -> {
 			accessMap.getFieldRef(this, args);
@@ -1565,7 +1564,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			needed.accept(args);
 		});
 	}
-
+	
 	@Override
 	public final void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		accessMap.markTemporary();
@@ -1593,10 +1592,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		accessMap.dropTemporary(body);
 	}
-
+	
 	private void injectWriteValue(CodeBlock body, AccessMap accessMap, String value, boolean boxed) throws MalformedJorth{
-		var primitive = SupportedPrimitive.get(getType()).orElseThrow();
-		CodeArg getValue = args -> { args.get(value); if(boxed) args.unbox(); };
+		var     primitive = SupportedPrimitive.get(getType()).orElseThrow();
+		CodeArg getValue  = args -> { args.get(value); if(boxed) args.unbox(); };
 		if(primitive == SupportedPrimitive.BYTE){
 			if(!boxed){
 				injectWriteSize(body, accessMap, args -> args.get(NumberSize.class, "BYTE"));
@@ -1627,7 +1626,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		};
 		body.call(method, args -> {
 			args.get("dest"); getValue.accept(args);
-			if(primitive != SupportedPrimitive.FLOAT && primitive != SupportedPrimitive.DOUBLE && primitive != SupportedPrimitive.LONG) args.cast(int.class);
+			if(primitive != SupportedPrimitive.FLOAT && primitive != SupportedPrimitive.DOUBLE && primitive != SupportedPrimitive.LONG)
+				args.cast(int.class);
 		});
 	}
 	

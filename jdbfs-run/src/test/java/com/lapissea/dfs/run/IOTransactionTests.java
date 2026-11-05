@@ -57,7 +57,7 @@ public class IOTransactionTests{
 				io.setPos(1);
 				io.write(new byte[]{11, 12, 13, 14});
 				checkMismatchBin(mem, 0, 11, 12, 13, 14, 5);
-			
+				
 				io.setPos(0);
 				checkMismatchBin(io.readInts1(3), new byte[]{0, 11, 12});
 				io.setPos(3);
@@ -72,15 +72,15 @@ public class IOTransactionTests{
 		
 		try(var ignore = mem.startTransaction()){
 			try(var io = mem.io()){
-			
+				
 				io.setPos(1);
 				io.write(new byte[]{11, 12});
 				checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
-			
+				
 				io.setPos(5);
 				io.write(new byte[]{15, 16});
 				checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
-			
+				
 				io.setPos(3);
 				io.write(new byte[]{13, 14});
 				checkMismatchBin(mem, 0, 11, 12, 13, 14, 15, 16, 7);
@@ -94,15 +94,15 @@ public class IOTransactionTests{
 		
 		try(var ignore = mem.startTransaction()){
 			try(var io = mem.io()){
-			
+				
 				io.setPos(1);
 				io.write(new byte[]{11, 12});
 				checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
-			
+				
 				io.setPos(5);
 				io.write(new byte[]{15, 16});
 				checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
-			
+				
 				io.setPos(2);
 				io.write(new byte[]{112, 13, 14});
 				checkMismatchBin(mem, 0, 11, 112, 13, 14, 15, 16, 7);
@@ -116,15 +116,15 @@ public class IOTransactionTests{
 		
 		try(var ignore = mem.startTransaction()){
 			try(var io = mem.io()){
-			
+				
 				io.setPos(1);
 				io.write(new byte[]{11, 12});
 				checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
-			
+				
 				io.setPos(5);
 				io.write(new byte[]{15, 16});
 				checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
-			
+				
 				io.setPos(3);
 				io.write(new byte[]{13, 14, 115});
 				checkMismatchBin(mem, 0, 11, 12, 13, 14, 115, 16, 7);
@@ -138,7 +138,7 @@ public class IOTransactionTests{
 		
 		try(var ignore = e.startTransaction()){
 			try(var io = e.io()){
-			
+				
 				io.setPos(0);
 				io.write(new byte[]{10});
 				checkMismatchBin(e, 10, 1, 2, 3, 4, 5, 6, 7);
@@ -148,7 +148,7 @@ public class IOTransactionTests{
 				io.setPos(4);
 				io.write(new byte[]{14, 15, 16});
 				checkMismatchBin(e, 10, 1, 12, 3, 14, 15, 16, 7);
-			
+				
 				io.setPos(0);
 				io.write(new byte[]{110, 11, 112, 13});
 				checkMismatchBin(e, 110, 11, 112, 13, 14, 15, 16, 7);
@@ -162,7 +162,7 @@ public class IOTransactionTests{
 		
 		try(var ignore = e.startTransaction()){
 			try(var io = e.io()){
-			
+				
 				io.setPos(0);
 				io.write(new byte[]{10});
 				checkMismatchBin(e, 10, 1, 2, 3, 4, 5, 6, 7);
@@ -172,7 +172,7 @@ public class IOTransactionTests{
 				io.setPos(4);
 				io.write(new byte[]{14, 15, 16});
 				checkMismatchBin(e, 10, 1, 12, 3, 14, 15, 16, 7);
-			
+				
 				io.setPos(0);
 				io.write(new byte[]{20, 11, 22, 13, 114});
 				checkMismatchBin(e, 20, 11, 22, 13, 114, 15, 16, 7);

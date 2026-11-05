@@ -3,8 +3,8 @@ package com.lapissea.dfs.io.instancepipe;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.logging.Log;
@@ -15,8 +15,8 @@ import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
+import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.CodeArg;
@@ -28,8 +28,8 @@ import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.CallSite;
+import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -58,18 +58,18 @@ public final class PipeCodeGen{
 		if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, rootType);
 		return pipes.get(type);
 	}
-
+	
 	// The generated class supplies its own lookup; class data keeps captured objects alive with that class.
 	public static Object classConstant(MethodHandles.Lookup lookup, int index) throws IllegalAccessException{
 		return MethodHandles.classDataAt(lookup, "_", Object.class, index);
 	}
-
+	
 	public static void loadConstant(CodeBlock body, List<Object> constants, Object value, Class<?> type) throws MalformedJorth{
 		int index = constants.size();
 		constants.add(value);
 		body.call(PipeCodeGen.class, "classConstant", args -> args.call(MethodHandles.class, "lookup").val(index)).cast(type);
 	}
-
+	
 	static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, UnsafeConsumer<ClassDefinition, Throwable> generateFn) throws Throwable{
 		return makeImpl(lookup, fnName, new ArrayList<>(), generateFn);
 	}
@@ -137,7 +137,7 @@ public final class PipeCodeGen{
 		}
 		
 		injectReadFields(body, generators, accessMap);
-
+		
 		switch(strategy){
 			case ConstructionStrategy.Setters ignore -> accessMap.getObject(body);
 			case ConstructionStrategy.Constructor(var fields) -> {
@@ -295,7 +295,7 @@ public final class PipeCodeGen{
 	
 	private static void injectReadFields(CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		if(!body.stackView().isEmpty()) throw new MalformedJorth("Field reads require an empty operand stack");
-
+		
 		for(SpecializedGenerator generator : generators){
 			accessMap.markTemporary();
 			try{
@@ -370,22 +370,22 @@ public final class PipeCodeGen{
 	public static <T extends IOInstance<T>> void writeKnownSize(StructPipe<T> pipe, VarPool<T> pool, DataProvider provider, ContentWriter dest, T instance, IOField<T, ?> field) throws IOException{
 		pipe.writeFieldKnownSize(pool, provider, dest, instance, field);
 	}
-
+	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static Object getAccessorValue(Object accessor, VarPool<?> pool, IOInstance<?> instance){
 		return ((FieldAccessor)accessor).get(pool, instance);
 	}
-
+	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static void setAccessorValue(Object accessor, VarPool<?> pool, IOInstance<?> instance, Object value){
 		((FieldAccessor)accessor).set(pool, instance, value);
 	}
-
+	
 	public static IOException reportWriteFailure(IOException failure, IOField<?, ?> field){
 		failure.addSuppressed(new IOException("Failed to write " + field));
 		return failure;
 	}
-
+	
 	private static void injectWriteFields(CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, String pipeLocal) throws MalformedJorth, UnsupportedCodeGenType{
 		accessMap.setupForWrite();
 		body.get("instance").cast(body.getTypeDef("ObjType"));
@@ -417,9 +417,9 @@ public final class PipeCodeGen{
 			}
 		});
 	}
-
+	
 	private static void overwriteWriteFields(ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, int pipeIndex) throws MalformedJorth, UnsupportedCodeGenType{
-		var objType = cw.getTypeDef("ObjType");
+		var objType  = cw.getTypeDef("ObjType");
 		var poolType = GenericType.of(VarPool.class).withArgs(objType);
 		var body = cw.function("writeFields").visibility(Visibility.PROTECTED)
 		             .arg(FieldSet.class, "fields").arg(poolType, "ioPool")
@@ -428,8 +428,9 @@ public final class PipeCodeGen{
 		CodeArg superArgs = args -> args.get("fields").get("ioPool").get("provider").get("dest").get("instance");
 		body.get("fields").get("this").call("getSpecificFields").equalityOp().ifTrue(full -> {
 			if(generators != null){
-				try{ injectWriteFields(full, generators, accessMap, "this"); }
-				catch(UnsupportedCodeGenType e){ throw com.lapissea.util.UtilL.uncheckedThrow(e); }
+				try{ injectWriteFields(full, generators, accessMap, "this"); }catch(UnsupportedCodeGenType e){
+					throw com.lapissea.util.UtilL.uncheckedThrow(e);
+				}
 			}else{
 				full.callVirtual(fn -> fn.caller(PipeCodeGen.class, "bootstrapWriteFields").arg(Class.class, objType).arg(int.class, pipeIndex),
 				                 call -> call.name("writeFields").arg(StructPipe.class).arg(poolType).arg(DataProvider.class).arg(ContentWriter.class).arg(objType).returns(boolean.class),
@@ -438,11 +439,11 @@ public final class PipeCodeGen{
 			}
 		}).elseRun(partial -> partial.callSuper(superArgs));
 	}
-
+	
 	public static <T extends IOInstance<T>> CallSite bootstrapWriteFields(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType, int pipeIndex) throws Throwable{
 		var source = (StructPipe<?>)classConstant(lookup, pipeIndex);
 		source.waitForState(StructPipe.LOCAL_DATA);
-		var constants = new ArrayList<Object>();
+		var                        constants = new ArrayList<Object>();
 		List<SpecializedGenerator> generators;
 		try{
 			@SuppressWarnings({"unchecked", "rawtypes"})
@@ -464,9 +465,9 @@ public final class PipeCodeGen{
 			body.val(compiled != null).returnOp();
 		}));
 	}
-
+	
 	private static void overwriteSkipFields(ClassDefinition cw, int pipeIndex) throws MalformedJorth{
-		var objType = cw.getTypeDef("ObjType");
+		var objType  = cw.getTypeDef("ObjType");
 		var poolType = GenericType.of(VarPool.class).withArgs(objType);
 		var body = cw.function("skipFields").visibility(Visibility.PROTECTED)
 		             .arg(poolType, "ioPool").arg(DataProvider.class, "provider").arg(ContentReader.class, "src")
@@ -475,11 +476,11 @@ public final class PipeCodeGen{
 		                 call -> call.name("skipFields").arg(poolType).arg(DataProvider.class).arg(ContentReader.class).arg(objType).arg(GenericContext.class),
 		                 args -> args.get("ioPool").get("provider").get("src").get("instance").cast(objType).get("genericContext"));
 	}
-
+	
 	public static <T extends IOInstance<T>> CallSite bootstrapSkipFields(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType, int pipeIndex) throws Throwable{
 		var source = (StandardStructPipe<?>)classConstant(lookup, pipeIndex);
 		source.waitForState(StructPipe.LOCAL_DATA);
-		var steps = source.skipSteps();
+		var steps     = source.skipSteps();
 		var constants = new ArrayList<Object>();
 		return new ConstantCallSite(makeImpl(lookup, name, constants, cw -> {
 			cw.typeDef("ObjType", objType);
@@ -507,7 +508,7 @@ public final class PipeCodeGen{
 			}
 		}));
 	}
-
+	
 	static void defaultClassDef(ClassDefinition cw) throws MalformedJorth{
 		defaultClassDef(cw, c -> c.call(Struct.class, "of", c2 -> c2.val(cw.getTypeDef("ObjType"))).get("syncStage"));
 	}
@@ -547,7 +548,7 @@ public final class PipeCodeGen{
 			overwriteWriteFields(cw, generators, accessMap, pipeIndex);
 			if(sourcePipe instanceof StandardStructPipe<?>) overwriteSkipFields(cw, pipeIndex);
 		}
-
+		
 		boolean noCtor = concreteType.isAnnotationPresent(Struct.NoDefaultConstructor.class);
 		
 		if(eagerDoRead){

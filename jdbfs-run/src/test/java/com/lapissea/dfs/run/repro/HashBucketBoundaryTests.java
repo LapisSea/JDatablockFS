@@ -5,14 +5,14 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOHashSet;
 import com.lapissea.dfs.objects.collections.IOSet;
-import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-public class HashBucketBoundaryTests{
 
+public class HashBucketBoundaryTests{
+	
 	private static final int MIN_HASH_KEY = 0x7EC69360;
 	
 	private static int mixMurmur32(int z){

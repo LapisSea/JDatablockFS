@@ -44,7 +44,7 @@ import java.util.stream.Stream;
 import static org.testng.Assert.*;
 
 public final class DistributedSessionTest{
-
+	
 	@Test(timeOut = 15000)
 	public void helperDiagnosticsIgnoreOldJobsAndPreserveQueueBound() throws Exception{
 		var session  = new DistributedSession(List.of());
@@ -58,7 +58,7 @@ public final class DistributedSessionTest{
 			                                 FuzzingRunner::noopAction);
 			var run = executor.submit(() -> session.execute(runner, HelperProtocolTest.recipe("ok"), new FuzzConfig().dontLog().withMaxWorkers(1),
 			                                                RunMark.NONE, () -> IntStream.range(0, 100).mapToObj(i -> new FuzzSequence(i, i, i, 1))));
-
+			
 			assertTrue(wire.receive() instanceof Wire.Job);
 			var first = (Wire.Work)wire.receive();
 			assertTrue(wire.receive() instanceof Wire.Work);
@@ -168,11 +168,11 @@ public final class DistributedSessionTest{
 		                             .withErrorTracking(new FuzzConfig.ErrorTracking(OptionalInt.of(2), true));
 		Supplier<Stream<FuzzSequence>> source =
 			() -> IntStream.range(0, 5).mapToObj(i -> new FuzzSequence(i, i, i, 1));
-
+		
 		var local = runner.runLocal(config, RunMark.NONE, source::get);
 		assertEquals(local.size(), 1);
 		assertEquals(local.getFirst().e().getMessage(), "failure 0");
-
+		
 		var session = new DistributedSession(List.of());
 		try{
 			var distributed = session.execute(runner, HelperProtocolTest.recipe("ok"), config, RunMark.NONE, source);
@@ -199,14 +199,14 @@ public final class DistributedSessionTest{
 			assertTrue(logs.getFirst() instanceof LogMessage.Start);
 			assertTrue(logs.getLast() instanceof LogMessage.End);
 			assertTrue(logs.stream().anyMatch(m -> m instanceof LogMessage.State));
-
+			
 			var deduplicated = session.execute(runner, HelperProtocolTest.recipe("ok"),
 			                                   config.withErrorTracking(new FuzzConfig.ErrorTracking(OptionalInt.empty(), true)), RunMark.NONE,
 			                                   () -> IntStream.range(0, 5).mapToObj(i -> new FuzzSequence(i, i, i, 1)));
 			assertEquals(deduplicated.size(), 1);
 		}finally{ session.close(); }
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void shortLocalJobAndHelperReuseRequireMasterReplay() throws Exception{
 		var session = new DistributedSession(List.of());
@@ -222,7 +222,7 @@ public final class DistributedSessionTest{
 		try{
 			assertTrue(session.execute(runner, HelperProtocolTest.recipe("ok"), config, RunMark.NONE,
 			                           () -> Stream.of(new FuzzSequence(0, 0, 0, 1))).isEmpty());
-
+			
 			try(var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress()); var helper = new Socket(InetAddress.getLoopbackAddress(),
 			                                                                                                   server.getLocalPort())){
 				session.attachHelper("helper", 1, server.accept());
@@ -241,7 +241,7 @@ public final class DistributedSessionTest{
 			}
 		}finally{ session.close(); }
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void remoteFailureThatPassesOnMasterStillFails() throws Exception{
 		var session = new DistributedSession(List.of());
@@ -280,7 +280,7 @@ public final class DistributedSessionTest{
 			session.close();
 		}
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void progressIncludesHelperTimingsAndAnnouncesConnectionOnce() throws Exception{
 		var session = new DistributedSession(List.of());
@@ -297,7 +297,7 @@ public final class DistributedSessionTest{
 				assertTrue(session.execute(runner, HelperProtocolTest.recipe("ok"), config, RunMark.NONE,
 				                           () -> IntStream.range(0, 10).mapToObj(i -> new FuzzSequence(i, i, i, 1))).isEmpty());
 			}
-
+			
 			assertEquals(logs.stream().filter(m -> m instanceof LogMessage.WorkerConnected).count(), 1L);
 			assertFalse(logs.stream().anyMatch(m -> m instanceof LogMessage.CustomMessage));
 			var states = logs.stream().filter(m -> m instanceof LogMessage.State).map(m -> (LogMessage.State)m).toList();
@@ -308,7 +308,7 @@ public final class DistributedSessionTest{
 			mock.join(1000);
 		}finally{ session.close(); }
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void localTimingAvailableWhileSequenceStillRunning() throws Exception{
 		var session = new DistributedSession(List.of());
@@ -342,7 +342,7 @@ public final class DistributedSessionTest{
 			session.close();
 		}
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void remoteTimingAvailableBeforeRemoteResult() throws Exception{
 		var session = new DistributedSession(List.of());
@@ -418,7 +418,7 @@ public final class DistributedSessionTest{
 			session.close();
 		}
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void failedSequenceOnlyCreditsCompletedOperations(){
 		var session = new DistributedSession(List.of());
@@ -430,7 +430,7 @@ public final class DistributedSessionTest{
 			var failures = session.execute(runner, HelperProtocolTest.recipe("ok"),
 			                               new FuzzConfig().withMaxWorkers(1).logWith(logs::add), RunMark.NONE,
 			                               () -> Stream.of(new FuzzSequence(0, 0, 0, 3)));
-
+			
 			assertEquals(failures.size(), 1);
 			var state = logs.stream().filter(LogMessage.State.class::isInstance).map(LogMessage.State.class::cast)
 			                .reduce((a, b) -> b).orElseThrow();
@@ -490,7 +490,7 @@ public final class DistributedSessionTest{
 			session.close();
 		}
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void invalidAndDuplicateFinishedReportsCannotChangeTiming() throws Exception{
 		var session = new DistributedSession(List.of());
@@ -510,7 +510,7 @@ public final class DistributedSessionTest{
 				                .withLogTimeout(Duration.ZERO).logWith(logs::add), RunMark.NONE,
 				() -> IntStream.range(0, 10).mapToObj(i -> new FuzzSequence(i, i, i, 1))
 			);
-
+			
 			assertTrue(failures.isEmpty());
 			var states = logs.stream().filter(LogMessage.State.class::isInstance).map(LogMessage.State.class::cast).toList();
 			assertEquals(states.getLast().progress(), 1D);
@@ -553,7 +553,7 @@ public final class DistributedSessionTest{
 			var accepted = server.accept();
 			session.attachHelper("helper", 1, accepted);
 			helper.close();
-
+			
 			long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
 			while(!accepted.isClosed() && System.nanoTime()<deadline){ Thread.sleep(5); }
 			assertTrue(accepted.isClosed(), "Master must close a disconnected helper's socket");
@@ -575,7 +575,7 @@ public final class DistributedSessionTest{
 				FuzzingStateEnv.JustRandom.<Object, Exception>of((random, index, mark) -> { }),
 				FuzzingRunner::noopAction);
 			var bigRecipe = new byte[1<<20];
-
+			
 			var fails = session.execute(runner, bigRecipe, new FuzzConfig().dontLog().withMaxWorkers(1), RunMark.NONE,
 			                            () -> IntStream.range(0, 3).mapToObj(i -> new FuzzSequence(i, i, i, 1)));
 			assertTrue(fails.isEmpty());
@@ -594,7 +594,7 @@ public final class DistributedSessionTest{
 			var s1 = server.accept();
 			var s2 = server.accept();
 			var s3 = server.accept();
-
+			
 			session.attachHelper("dup", 1, s1);
 			assertThrows(IOException.class, () -> session.attachHelper("dup", 1, s2));
 			session.close();
@@ -607,11 +607,11 @@ public final class DistributedSessionTest{
 	private static Thread mockHelper(Socket socket, boolean failure) throws Exception{
 		return mockHelper(socket, failure, new AtomicInteger());
 	}
-
+	
 	private static Thread mockHelper(Socket socket, boolean failure, AtomicInteger acknowledgedResults) throws Exception{
 		return mockHelper(socket, failure, acknowledgedResults, false);
 	}
-
+	
 	private static Thread mockHelper(Socket socket, boolean failure, AtomicInteger acknowledgedResults, boolean invalidReports) throws Exception{
 		var wire     = new Wire(socket);
 		var assigned = new HashMap<Long, RemoteSequenceResult>();

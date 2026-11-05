@@ -13,7 +13,7 @@ public class StagedInitPublicationTests{
 	public Object[][] publicationFields(){
 		return new Object[][]{{"state"}, {"initInfo"}};
 	}
-
+	
 	// These fields are read by lock-free completion checks, so publication must be explicit.
 	@Test(dataProvider = "publicationFields")
 	public void completionFieldsAreVolatile(String name) throws NoSuchFieldException{

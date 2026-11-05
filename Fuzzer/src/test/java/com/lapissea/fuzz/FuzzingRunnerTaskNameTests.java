@@ -4,7 +4,9 @@ import org.testng.annotations.Test;
 
 import java.util.stream.Stream;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 
 /**
  * Regression for {@link FuzzingRunner} crashing with {@code NoSuchElementException} when no call-stack

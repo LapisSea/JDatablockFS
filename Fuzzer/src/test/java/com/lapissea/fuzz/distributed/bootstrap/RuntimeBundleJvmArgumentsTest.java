@@ -23,7 +23,7 @@ public class RuntimeBundleJvmArgumentsTest{
 			try(var bundle = RuntimeBundle.capture()){
 				var argument = bundle.jvmArguments().stream().filter(a -> a.startsWith("--patch-module=java.base="))
 				                     .findFirst().orElseThrow(() -> new AssertionError("Patch argument lost"));
-				var name = argument.substring("--patch-module=java.base=".length());
+				var name     = argument.substring("--patch-module=java.base=".length());
 				var artifact = bundle.artifacts().stream().filter(a -> a.name().equals(name)).findFirst().orElseThrow();
 				try(var jar = new JarFile(artifact.file().toFile())){
 					if(jar.getJarEntry("patch-marker.txt") == null) throw new AssertionError("Patch contents lost");

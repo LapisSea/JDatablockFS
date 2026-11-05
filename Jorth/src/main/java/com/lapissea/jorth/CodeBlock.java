@@ -991,49 +991,65 @@ public class CodeBlock{
 		return add(Arithmetic.simulate(localStack, operation, constant));
 	}
 	
-	/** Replaces stack operands [..., left, right] with left op right; numeric categories must match. */
+	/**
+	 * Pops 2 numbers from stack, adds and pushes result back
+	 */
 	public CodeBlock add() throws MalformedJorth{ return arithmetic(ArithmeticOp.ADD, null); }
-	/** Applies a constant right operand; int constants adapt to the stack numeric type; other constants must match it. */
+	/**
+	 * Pops one number from the stack and adds it with the constant, then pushes result to stack
+	 */
 	public CodeBlock add(int val) throws MalformedJorth{ return arithmetic(ArithmeticOp.ADD, val); }
-	public CodeBlock add(long val) throws MalformedJorth{ return arithmetic(ArithmeticOp.ADD, val); }
-	public CodeBlock add(float val) throws MalformedJorth{ return arithmetic(ArithmeticOp.ADD, val); }
+	public CodeBlock add(long val) throws MalformedJorth  { return arithmetic(ArithmeticOp.ADD, val); }
+	public CodeBlock add(float val) throws MalformedJorth { return arithmetic(ArithmeticOp.ADD, val); }
 	public CodeBlock add(double val) throws MalformedJorth{ return arithmetic(ArithmeticOp.ADD, val); }
-
-	/** Replaces stack operands [..., left, right] with left op right; numeric categories must match. */
+	
+	/**
+	 * Pops 2 numbers from stack, subtracts and pushes result back
+	 */
 	public CodeBlock sub() throws MalformedJorth{ return arithmetic(ArithmeticOp.SUB, null); }
-	/** Applies a constant right operand; int constants adapt to the stack numeric type; other constants must match it. */
+	/**
+	 * Pops one number from the stack and substracts it with the constant, then pushes result to stack
+	 */
 	public CodeBlock sub(int val) throws MalformedJorth{ return arithmetic(ArithmeticOp.SUB, val); }
-	public CodeBlock sub(long val) throws MalformedJorth{ return arithmetic(ArithmeticOp.SUB, val); }
-	public CodeBlock sub(float val) throws MalformedJorth{ return arithmetic(ArithmeticOp.SUB, val); }
+	public CodeBlock sub(long val) throws MalformedJorth  { return arithmetic(ArithmeticOp.SUB, val); }
+	public CodeBlock sub(float val) throws MalformedJorth { return arithmetic(ArithmeticOp.SUB, val); }
 	public CodeBlock sub(double val) throws MalformedJorth{ return arithmetic(ArithmeticOp.SUB, val); }
-
-	/** Replaces stack operands [..., left, right] with left op right; numeric categories must match. */
+	
+	/**
+	 * Pops 2 numbers from stack, multiplies and pushes result back
+	 */
 	public CodeBlock mul() throws MalformedJorth{ return arithmetic(ArithmeticOp.MUL, null); }
-	/** Applies a constant right operand; int constants adapt to the stack numeric type; other constants must match it. */
+	/**
+	 * Pops one number from the stack and multiplies it with the constant, then pushes result to stack
+	 */
 	public CodeBlock mul(int val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MUL, val); }
-	public CodeBlock mul(long val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MUL, val); }
-	public CodeBlock mul(float val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MUL, val); }
+	public CodeBlock mul(long val) throws MalformedJorth  { return arithmetic(ArithmeticOp.MUL, val); }
+	public CodeBlock mul(float val) throws MalformedJorth { return arithmetic(ArithmeticOp.MUL, val); }
 	public CodeBlock mul(double val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MUL, val); }
-
-	/** Replaces stack operands [..., left, right] with left op right; numeric categories must match. */
+	
+	/**
+	 * Pops 2 numbers from stack, divides and pushes result back
+	 */
 	public CodeBlock div() throws MalformedJorth{ return arithmetic(ArithmeticOp.DIV, null); }
-	/** Applies a constant right operand; int constants adapt to the stack numeric type; other constants must match it. */
+	/**
+	 * Pops one number from the stack and divides it with the constant, then pushes result to stack
+	 */
 	public CodeBlock div(int val) throws MalformedJorth{ return arithmetic(ArithmeticOp.DIV, val); }
-	public CodeBlock div(long val) throws MalformedJorth{ return arithmetic(ArithmeticOp.DIV, val); }
-	public CodeBlock div(float val) throws MalformedJorth{ return arithmetic(ArithmeticOp.DIV, val); }
+	public CodeBlock div(long val) throws MalformedJorth  { return arithmetic(ArithmeticOp.DIV, val); }
+	public CodeBlock div(float val) throws MalformedJorth { return arithmetic(ArithmeticOp.DIV, val); }
 	public CodeBlock div(double val) throws MalformedJorth{ return arithmetic(ArithmeticOp.DIV, val); }
-
-	/** Java remainder (%), with the sign of the dividend. Replaces stack operands [..., left, right] with left op right; numeric categories must match. */
-	public CodeBlock mod() throws MalformedJorth{ return arithmetic(ArithmeticOp.MOD, null); }
-	/** Applies a constant right operand; int constants adapt to the stack numeric type; other constants must match it. */
-	public CodeBlock mod(int val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MOD, val); }
-	public CodeBlock mod(long val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MOD, val); }
-	public CodeBlock mod(float val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MOD, val); }
+	
+	public CodeBlock mod() throws MalformedJorth          { return arithmetic(ArithmeticOp.MOD, null); }
+	public CodeBlock mod(int val) throws MalformedJorth   { return arithmetic(ArithmeticOp.MOD, val); }
+	public CodeBlock mod(long val) throws MalformedJorth  { return arithmetic(ArithmeticOp.MOD, val); }
+	public CodeBlock mod(float val) throws MalformedJorth { return arithmetic(ArithmeticOp.MOD, val); }
 	public CodeBlock mod(double val) throws MalformedJorth{ return arithmetic(ArithmeticOp.MOD, val); }
-
-	/** Negates the top numeric operand, promoting byte, short and char to int. */
+	
+	/**
+	 * Negates the number on the stack
+	 */
 	public CodeBlock neg() throws MalformedJorth{ return arithmetic(ArithmeticOp.NEG, null); }
-
+	
 	public CodeBlock bitShiftRight(boolean logical, int val) throws MalformedJorth{
 		return val(val).bitShiftRight(logical);
 	}

@@ -1,8 +1,8 @@
 package com.lapissea.fuzz;
 
 import java.time.Duration;
-import java.util.Objects;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 

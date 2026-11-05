@@ -300,7 +300,7 @@ public class SpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnGroups = "specializedSimple")
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
 		LogUtil.println("Testing: " + field + (immediate? ", immediate" : ""));

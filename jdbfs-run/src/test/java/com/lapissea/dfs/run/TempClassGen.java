@@ -202,6 +202,6 @@ public final class TempClassGen{
 			    .setThis(field.name);
 		}
 	}
-
+	
 	
 }

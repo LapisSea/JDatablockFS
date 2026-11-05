@@ -4,6 +4,7 @@ import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -25,10 +26,6 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
-import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
-import com.lapissea.jorth.CodeBlock;
-import com.lapissea.jorth.CodeArg;
-import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -36,6 +33,9 @@ import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
@@ -45,7 +45,6 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 
@@ -207,7 +206,7 @@ public class InstanceCollection{
 		
 		@Override
 		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
-
+		
 		@Override
 		public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 			injectWriteFieldNullable(body, accessMap, null, writer -> {
@@ -217,7 +216,7 @@ public class InstanceCollection{
 				writer.call("write", args -> args.get(value).get("provider").get("dest"));
 			});
 		}
-
+		
 		@Override
 		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 			injectReadFieldNullable(body, accessMap, null, value -> {
@@ -390,7 +389,7 @@ public class InstanceCollection{
 		
 		@Override
 		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
-
+		
 		@Override
 		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 			var reference = getDependencies().requireExact(Reference.class, FieldNames.ref(getAccessor()));

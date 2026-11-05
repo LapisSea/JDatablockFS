@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.field;
 
-import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
@@ -193,7 +193,7 @@ public final class VaryingSize implements Stringify{
 			private record Mark(int counter, Map<String, UIDInfo> uidMap){ }
 			
 			private final List<NumberSize> data;
-			private final List<Integer> ids;
+			private final List<Integer>    ids;
 			private       int              counter;
 			
 			private final Map<Integer, Mark> marks = new HashMap<>();
@@ -261,7 +261,7 @@ public final class VaryingSize implements Stringify{
 		static Provider repeatSizes(List<VaryingSize> data){
 			return new Repeater(data.stream().map(v -> v.size).toList(), data.stream().map(v -> v.id).toList());
 		}
-
+		
 		static Provider constLimit(NumberSize size, int id){
 			if(size == NumberSize.LARGEST) return ALL_MAX;
 			return new NoMark(){

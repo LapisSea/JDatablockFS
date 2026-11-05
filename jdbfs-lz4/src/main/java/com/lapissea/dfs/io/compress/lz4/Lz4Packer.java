@@ -93,11 +93,11 @@ public abstract sealed class Lz4Packer implements Packer{
 			private static final LZ4FastDecompressor INST = getFactory().fastDecompressor();
 		}
 		int orgLen = readSiz(packedData);
-		if(orgLen < 0){
+		if(orgLen<0){
 			throw new IOException("Corrupt LZ4 payload: negative original length " + orgLen);
 		}
 		int headerBytes = sizeBytes(orgLen);
-		if(packedData.length < headerBytes){
+		if(packedData.length<headerBytes){
 			throw new IOException("Corrupt LZ4 payload: buffer shorter than its length header");
 		}
 		try{

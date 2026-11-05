@@ -7,7 +7,6 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -26,13 +25,13 @@ public class AddManyIntegrityTest{
 	
 	@Test
 	public void addManyAcrossBatchesKeepsContent() throws IOException{
-		var cluster = Cluster.emptyMem();
-		IOList<Integer> list = cluster.roots().request("L", IOList.class, int.class);
+		var             cluster = Cluster.emptyMem();
+		IOList<Integer> list    = cluster.roots().request("L", IOList.class, int.class);
 		
 		//well over BATCH_BYTES (default 8192) to force many flushes
 		int count = 5_000;
-		var exp = new ArrayList<Integer>(count);
-		for(int i = 0; i<count; i++) exp.add(i * 31);
+		var exp   = new ArrayList<Integer>(count);
+		for(int i = 0; i<count; i++) exp.add(i*31);
 		list.addAll(exp);
 		
 		assertEquals((long)list.size(), count);
@@ -43,11 +42,11 @@ public class AddManyIntegrityTest{
 	
 	@Test
 	public void addManyAcrossBatchesKeepsChainSize() throws IOException{
-		var cluster = Cluster.emptyMem();
-		IOList<Integer> list = cluster.roots().request("L", IOList.class, int.class);
+		var             cluster = Cluster.emptyMem();
+		IOList<Integer> list    = cluster.roots().request("L", IOList.class, int.class);
 		
 		int count = 10_000;
-		var exp = new ArrayList<Integer>(count);
+		var exp   = new ArrayList<Integer>(count);
 		for(int i = 0; i<count; i++) exp.add(i);
 		list.addAll(exp);
 		
@@ -61,11 +60,11 @@ public class AddManyIntegrityTest{
 	
 	@Test
 	public void stringAddManyAcrossBatches() throws IOException{
-		var cluster = Cluster.emptyMem();
-		IOList<String> list = cluster.roots().request("L", IOList.class, String.class);
+		var            cluster = Cluster.emptyMem();
+		IOList<String> list    = cluster.roots().request("L", IOList.class, String.class);
 		
 		int count = 3_000;
-		var exp = new ArrayList<String>(count);
+		var exp   = new ArrayList<String>(count);
 		for(int i = 0; i<count; i++) exp.add("string-number-" + i);
 		list.addAll(exp);
 		

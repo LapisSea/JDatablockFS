@@ -22,17 +22,17 @@ public class PosixBootstrapTest{
 	public void preparationResolvesQuotedPathsAndReservesCachedArtifacts() throws Exception{
 		var root = Files.createTempDirectory("fuzz scripts ' $()-");
 		try{
-			var cache = Files.createDirectory(root.resolve("cache"));
-			var alias = Files.createSymbolicLink(root.resolve("cache alias"), cache);
-			var parent = root.resolve("work ' directory");
-			var hash = "a".repeat(64);
+			var cache     = Files.createDirectory(root.resolve("cache"));
+			var alias     = Files.createSymbolicLink(root.resolve("cache alias"), cache);
+			var parent    = root.resolve("work ' directory");
+			var hash      = "a".repeat(64);
 			var directory = Files.createDirectory(cache.resolve(hash));
 			Files.writeString(directory.resolve(".fuzzer-managed"), RemoteWorkspace.MARKER);
 			var cached = Files.writeString(directory.resolve("cached '.jar"), "keep");
 			Files.setLastModifiedTime(cached, FileTime.fromMillis(0));
 			var artifactNames = List.of(hash + "/cached '.jar", "b".repeat(64) + "/missing.jar");
-			var session = UUID.randomUUID();
-			var output = run(root, PosixBootstrap.INSTANCE.prepare(alias.toString(), parent.toString(), session, artifactNames).command());
+			var session       = UUID.randomUUID();
+			var output        = run(root, PosixBootstrap.INSTANCE.prepare(alias.toString(), parent.toString(), session, artifactNames).command());
 			
 			assertEquals(output.lines().toList(), List.of(cache.toRealPath().toString(), parent.toRealPath().toString(), "1"));
 			assertTrue(Files.exists(cache.resolve(".preparing/" + session)));
@@ -50,7 +50,7 @@ public class PosixBootstrapTest{
 			var cache = Files.createDirectory(root.resolve("cache"));
 			Files.createDirectory(cache.resolve(".preparing"));
 			var session = UUID.randomUUID();
-			var other = UUID.randomUUID();
+			var other   = UUID.randomUUID();
 			for(var id : List.of(session, other)){
 				Files.writeString(cache.resolve(".preparing/" + id), "");
 				Files.createDirectory(cache.resolve(".upload-" + id));
@@ -70,7 +70,7 @@ public class PosixBootstrapTest{
 	}
 	
 	private static String run(Path root, String script) throws Exception{
-		var output = Files.createTempFile(root, "shell-output-", ".txt");
+		var output  = Files.createTempFile(root, "shell-output-", ".txt");
 		var process = new ProcessBuilder("sh", "-c", script).redirectErrorStream(true).redirectOutput(output.toFile()).start();
 		
 		try{

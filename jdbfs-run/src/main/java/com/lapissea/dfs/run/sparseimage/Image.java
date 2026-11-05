@@ -7,8 +7,9 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
-public class Image extends IOInstance.Managed<Image>{
 
+public class Image extends IOInstance.Managed<Image>{
+	
 	@IOValue
 	public static class Pixel extends IOInstance.Managed<Pixel>{
 		private float r;

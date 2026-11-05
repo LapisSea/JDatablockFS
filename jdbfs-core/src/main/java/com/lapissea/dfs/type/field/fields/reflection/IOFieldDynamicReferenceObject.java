@@ -219,7 +219,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	protected IOField<CTyp, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
 		return this;
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		var reference = getDependencies().requireExact(Reference.class, FieldNames.ref(getAccessor()));
@@ -238,7 +238,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			});
 		});
 	}
-
+	
 	public ValueType readReferencedValue(DataProvider provider, int id, Reference reference, GenericContext genericContext) throws IOException{
 		return readValue(provider, provider.getTypeDb().fromID(id), reference, makeContext(genericContext));
 	}

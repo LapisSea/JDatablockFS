@@ -25,8 +25,8 @@ import java.io.IOException;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.ArrayList;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -176,10 +176,10 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		
 		FieldSet<T>    fields = report.allFields();
 		List<CmdBuild> cmds   = new ArrayList<>(fields.size());
-
+		
 		// Only variable-size skips need values. Include prerequisites of the reads they require,
 		// and map unpacked bit fields back to the merged field that must be read as a whole.
-		var owners = new HashMap<IOField<T, ?>, IOField<T, ?>>();
+		var owners  = new HashMap<IOField<T, ?>, IOField<T, ?>>();
 		var pending = new ArrayDeque<IOField<T, ?>>();
 		for(var field : fields){
 			for(var unpacked : field.iterUnpackedFields()){
@@ -190,7 +190,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var requiredReads = new HashSet<IOField<T, ?>>();
 		while(!pending.isEmpty()){
 			var dependency = pending.removeFirst();
-			var owner = owners.getOrDefault(dependency, dependency);
+			var owner      = owners.getOrDefault(dependency, dependency);
 			if(!requiredReads.add(owner)) continue;
 			for(var unpacked : owner.iterUnpackedFields()) pending.addAll(unpacked.getDependencies());
 		}
@@ -257,7 +257,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		
 		skipFields(pool, provider, src, inst, genericContext);
 	}
-
+	
 	protected void skipFields(VarPool<T> pool, DataProvider provider, ContentReader src, T inst, GenericContext genericContext) throws IOException{
 		var skip = skipData();
 		var cmds = skip.cmds;
@@ -277,12 +277,12 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	}
 	
 	record SkipStep(int operation, long bytes, IOField<?, ?> field){ }
-
+	
 	List<SkipStep> skipSteps(){
 		var skip = skipData();
 		if(skip == null) return List.of();
 		var result = new ArrayList<SkipStep>();
-		var cmds = skip.cmds;
+		var cmds   = skip.cmds;
 		for(int f = 0, c = 0; c<cmds.length; f++){
 			int operation = cmds[c++];
 			if(operation == SKIP_FIXED){
@@ -294,7 +294,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 		return result;
 	}
-
+	
 	private T genericReadNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		return super.readNew(provider, src, genericContext);
 	}

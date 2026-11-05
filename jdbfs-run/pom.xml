@@ -69,7 +69,9 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${maven-surefire-plugin-version}</version>
 				<configuration>
-					<argLine>--add-opens JDatablockFS.run/com.lapissea.dfs.run.repro=JDatablockFS.core --add-opens JDatablockFS.core/com.lapissea.dfs.objects.collections=JDatablockFS.run --add-opens JDatablockFS.core/com.lapissea.dfs.type=JDatablockFS.run</argLine>
+					<argLine>--add-opens JDatablockFS.run/com.lapissea.dfs.run.repro=JDatablockFS.core --add-opens JDatablockFS.core/com.lapissea.dfs.objects.collections=JDatablockFS.run --add-opens
+						JDatablockFS.core/com.lapissea.dfs.type=JDatablockFS.run
+					</argLine>
 				</configuration>
 			</plugin>
 			

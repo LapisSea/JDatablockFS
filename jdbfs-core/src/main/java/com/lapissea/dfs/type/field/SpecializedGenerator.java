@@ -37,7 +37,7 @@ public interface SpecializedGenerator{
 		}
 		@Override
 		default void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-			int bits = Math.toIntExact(getSizeDescriptor().requireFixed(WordSpace.BIT));
+			int bits  = Math.toIntExact(getSizeDescriptor().requireFixed(WordSpace.BIT));
 			int bytes = BitUtils.bitsToBytes(bits);
 			body.get("dest");
 			injectWriteFieldToBits(body, accessMap);
@@ -84,13 +84,13 @@ public interface SpecializedGenerator{
 		private final Map<IOField<?, ?>, AccessMap.GetInfo>    fieldRefFields = new IdentityHashMap<>();
 		private final Map<Class<?>, AccessMap.GetInfo>         enumArrays     = new HashMap<>();
 		private final Map<StructPipe<?>, AccessMap.GetInfo>    pipeRefs       = new IdentityHashMap<>();
-		private final Map<Object, AccessMap.GetInfo>           constantRefs  = new IdentityHashMap<>();
+		private final Map<Object, AccessMap.GetInfo>           constantRefs   = new IdentityHashMap<>();
 		
 		private int tmpFieldCount;
 		
-		private final ClassDefinition                cw;
-		private       int                            constantIndex;
-		private final List<Object> constants;
+		private final ClassDefinition cw;
+		private       int             constantIndex;
+		private final List<Object>    constants;
 		
 		private final List<Set<String>> temporaryStack = new ArrayList<>();
 		
@@ -115,7 +115,7 @@ public interface SpecializedGenerator{
 			localFields.clear();
 			temporaryStack.clear();
 		}
-
+		
 		public void setupForWrite(){
 			setup(true, false);
 			existingValues = true;
@@ -196,7 +196,7 @@ public interface SpecializedGenerator{
 				if(field.getType().isPrimitive()) args.box();
 			});
 		}
-
+		
 		public void storeConstructedInstanceFields(CodeBlock body) throws MalformedJorth{
 			if(localFields.keySet().stream().noneMatch(f -> f instanceof VirtualAccessor<?> v && v.getStoragePool() == StoragePool.INSTANCE)) return;
 			String object = "constructedObject_" + uniqueCounter();
@@ -208,7 +208,7 @@ public interface SpecializedGenerator{
 			}
 			body.get(object);
 		}
-
+		
 		private GetInfo getOrCreateAccessorInfo(FieldAccessor<?> field) throws MalformedJorth{
 			var accessorInfo = accessorFields.get(field);
 			if(accessorInfo == null){
@@ -257,7 +257,7 @@ public interface SpecializedGenerator{
 		}
 		private GetInfo createPipeRefConstant(StructPipe<?> pipe) throws MalformedJorth{
 			var struct = pipe.getType();
-			var name = "pipeRef_" + (constantIndex++) + "_" + struct.cleanName().replaceAll("[^A-Za-z]", "");
+			var name   = "pipeRef_" + (constantIndex++) + "_" + struct.cleanName().replaceAll("[^A-Za-z]", "");
 			
 			cw.field(GenericType.of(StructPipe.class).withArgs(struct.getType()), name)
 			  .visibility(Visibility.PRIVATE)
@@ -289,7 +289,7 @@ public interface SpecializedGenerator{
 			info.get(block);
 			block.cast(type);
 		}
-
+		
 		public void getFieldRef(IOField<?, ?> field, CodeBlock block) throws MalformedJorth{
 			var info = fieldRefFields.get(field);
 			if(info == null){
@@ -297,7 +297,7 @@ public interface SpecializedGenerator{
 			}
 			info.get(block);
 		}
-
+		
 		public void getValue(IOField<?, ?> field, CodeBlock block) throws MalformedJorth{
 			getFieldRef(field, block);
 			block.call("get", args -> {
@@ -308,7 +308,7 @@ public interface SpecializedGenerator{
 		
 		public void readStruct(StructPipe<?> pipe, CodeBlock block, CodeArg genericContext) throws MalformedJorth{
 			var struct = pipe.getType();
-			var info = pipeRefs.get(pipe);
+			var info   = pipeRefs.get(pipe);
 			if(info == null){
 				info = createPipeRefConstant(pipe);
 			}
@@ -389,7 +389,7 @@ public interface SpecializedGenerator{
 	}
 	
 	void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType;
-
+	
 	default void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		accessMap.getFieldRef((IOField<?, ?>)this, body);
 		body.call("write", args -> {
@@ -397,7 +397,7 @@ public interface SpecializedGenerator{
 			accessMap.getObject(args);
 		});
 	}
-
+	
 	default void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		accessMap.getFieldRef((IOField<?, ?>)this, body);
 		body.call("skip", args -> {

@@ -1,26 +1,13 @@
 package com.lapissea.dfs.benchmark;
 
-import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.utils.RawRandom;
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OperationsPerInvocation;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Param;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.TearDown;
-import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -41,18 +28,20 @@ import java.util.stream.IntStream;
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class HashMapBenchmark{
-
-	/** Constant occupancy exercises the actual BucketEntry/IONode allocation path. */
+	
+	/**
+	 * Constant occupancy exercises the actual BucketEntry/IONode allocation path.
+	 */
 	@State(Scope.Thread)
 	public static class NodeChurn{
-		private static final int SIZE = 1024;
-		private static final Integer VALUE = 42;
-		private final Integer[] keys = new Integer[SIZE];
-		private Cluster cluster;
-		private IOMap<Integer, Integer> map;
-		private int position;
-		private long initialSize;
-
+		private static final int                     SIZE  = 1024;
+		private static final Integer                 VALUE = 42;
+		private final        Integer[]               keys  = new Integer[SIZE];
+		private              Cluster                 cluster;
+		private              IOMap<Integer, Integer> map;
+		private              int                     position;
+		private              long                    initialSize;
+		
 		@Setup(Level.Trial)
 		public void setup() throws IOException{
 			cluster = Cluster.emptyMem();
@@ -65,7 +54,7 @@ public class HashMapBenchmark{
 			for(int i = 0; i<SIZE*2; i++) map.put(keys[i%SIZE], VALUE);
 			var random = new Random(69);
 			for(int i = SIZE - 1; i>0; i--){
-				int j = random.nextInt(i + 1);
+				int j   = random.nextInt(i + 1);
 				var key = keys[i];
 				keys[i] = keys[j];
 				keys[j] = key;
@@ -75,7 +64,7 @@ public class HashMapBenchmark{
 			guard.syncStruct();
 			initialSize = cluster.getSource().getIOSize();
 		}
-
+		
 		@TearDown(Level.Trial)
 		public void checkData() throws IOException{
 			if(map.size() != SIZE) throw new IllegalStateException("Map occupancy changed");
@@ -87,8 +76,10 @@ public class HashMapBenchmark{
 			}
 		}
 	}
-
-	/** Time per remove/reinsert pair, including node reclamation and initialization. */
+	
+	/**
+	 * Time per remove/reinsert pair, including node reclamation and initialization.
+	 */
 	@Benchmark
 	@BenchmarkMode(Mode.AverageTime)
 	@OutputTimeUnit(TimeUnit.NANOSECONDS)

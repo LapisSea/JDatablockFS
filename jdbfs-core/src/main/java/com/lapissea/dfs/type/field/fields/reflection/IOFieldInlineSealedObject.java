@@ -3,10 +3,11 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.io.instancepipe.PipeCodeGen;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
@@ -17,18 +18,17 @@ import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
-import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
-import com.lapissea.jorth.CodeBlock;
-import com.lapissea.jorth.CodeArg;
-import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -223,16 +223,16 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			}
 		}
 		
-		var id = getUniverseID(ioPool, instance);
+		var id           = getUniverseID(ioPool, instance);
 		var instancePipe = resolveInstancePipe(provider, id);
 		
 		instancePipe.skip(provider, src, makeContext(genericContext));
 	}
-
+	
 	public StructPipe<ValueType> resolveInstancePipe(DataProvider provider, int id) throws IOException{
 		return PipeCodeGen.resolveSealedPipe(provider, rootType, id, typeToPipe);
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		CodeArg read = value -> {

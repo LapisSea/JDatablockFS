@@ -141,9 +141,9 @@ public final class BBView{
 	
 	private static VarHandle var(Class<?> c){ return byteArrayViewVarHandle(c.arrayType(), LITTLE_ENDIAN).withInvokeExactBehavior(); }
 	
-	//////////WRITE//////////
+	/// ///////WRITE//////////
 	
-	public static void writeInt1(byte[] out, int off, byte value)    { out[off] = value; }
+	public static void writeInt1(byte[] out, int off, byte value){ out[off] = value; }
 	public static void writeChar2(byte[] byteBuffer, int off, char v){ CHAR_VIEW.set(byteBuffer, off, v); }
 	public static void writeInt2(byte[] byteBuffer, int off, short v){ SHORT_VIEW.set(byteBuffer, off, v); }
 	public static void writeInt3(byte[] byteBuffer, int off, int v){
@@ -167,9 +167,9 @@ public final class BBView{
 	public static void writeFloat4(byte[] byteBuffer, int off, float v) { FLOAT_VIEW.set(byteBuffer, off, v); }
 	public static void writeFloat8(byte[] byteBuffer, int off, double v){ DOUBLE_VIEW.set(byteBuffer, off, v); }
 	
-	//////////READ//////////
+	/// ///////READ//////////
 	
-	public static char readChar2(byte[] byteBuffer, int offset)      { return (char)CHAR_VIEW.get(byteBuffer, offset); }
+	public static char readChar2(byte[] byteBuffer, int offset){ return (char)CHAR_VIEW.get(byteBuffer, offset); }
 	public static short readInt2(byte[] byteBuffer, int offset)      { return (short)SHORT_VIEW.get(byteBuffer, offset); }
 	public static int readUnsignedInt2(byte[] byteBuffer, int offset){ return readChar2(byteBuffer, offset); }
 	public static int readUnsignedInt3(byte[] byteBuffer, int offset){

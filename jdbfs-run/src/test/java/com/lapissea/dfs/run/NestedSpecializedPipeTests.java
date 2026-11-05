@@ -32,36 +32,36 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class NestedSpecializedPipeTests{
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class Child extends IOInstance.Managed<Child>{
 		@IODependency.VirtualNumSize
 		private long value;
-
-		public Child(){ }
+		
+		public Child()          { }
 		public Child(long value){ this.value = value; }
 	}
-
+	
 	@IOValue
 	public static class CachedChild extends IOInstance.Managed<CachedChild>{
 		@IODependency.VirtualNumSize
 		private long value;
-
-		public CachedChild(){ }
+		
+		public CachedChild()          { }
 		public CachedChild(long value){ this.value = value; }
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class IntChild extends IOInstance.Managed<IntChild>{
 		@IODependency.VirtualNumSize
 		private int value;
-
-		public IntChild(){ }
+		
+		public IntChild()         { }
 		public IntChild(int value){ this.value = value; }
 	}
-
+	
 	@Test
 	public void generatedLongReadersSupportEverySignedStorageWidth() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -80,7 +80,7 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedIntReadersSupportEverySignedStorageWidth() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -100,7 +100,7 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void cachedNestedPipePreservesParentSizeId() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -110,7 +110,7 @@ public class NestedSpecializedPipeTests{
 				FixedVaryingStructPipe.tryVarying(struct, VaryingSize.Provider.repeat(List.of(NumberSize.BYTE)));
 				var provider = VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.BYTE));
 				provider.provide(NumberSize.LONG, null, false);
-				var pipe = FixedVaryingStructPipe.tryVarying(struct, provider);
+				var pipe           = FixedVaryingStructPipe.tryVarying(struct, provider);
 				var cachedProvider = VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.BYTE));
 				cachedProvider.provide(NumberSize.LONG, null, false);
 				assertThat(FixedVaryingStructPipe.tryVarying(struct, cachedProvider)).isSameAs(pipe);
@@ -123,15 +123,15 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	@IOInstance.Order({"left", "right", "tail"})
 	public static class Element extends IOInstance.Managed<Element>{
 		private Child left;
 		private Child right;
-		private byte tail;
-
+		private byte  tail;
+		
 		public Element(){ }
 		public Element(long left, long right, byte tail){
 			this.left = new Child(left);
@@ -139,51 +139,51 @@ public class NestedSpecializedPipeTests{
 			this.tail = tail;
 		}
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	@IOInstance.Order({"left", "right"})
 	public static class ImmutableElement extends IOInstance.Managed<ImmutableElement>{
 		private final Child left;
 		private final Child right;
-
+		
 		public ImmutableElement(Child left, Child right){
 			this.left = left;
 			this.right = right;
 		}
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	@IOInstance.Order({"child", "tail"})
 	public static class NullableElement extends IOInstance.Managed<NullableElement>{
 		@IONullability(IONullability.Mode.NULLABLE)
 		private Child child;
-		private byte tail;
-
+		private byte  tail;
+		
 		public NullableElement(){ }
 		public NullableElement(Child child, byte tail){
 			this.child = child;
 			this.tail = tail;
 		}
 	}
-
+	
 	@IOValue
 	@StructPipe.Special
 	public static class TemporalElement extends IOInstance.Managed<TemporalElement>{
-		private Duration duration;
-		private Instant instant;
+		private Duration      duration;
+		private Instant       instant;
 		private LocalDateTime localDateTime;
-
+		
 		public TemporalElement(){ }
 	}
-
+	
 	@Test
 	public void varyingReadersPreserveTemporalWrapperLayouts() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
 				var pipe = FixedVaryingStructPipe.tryVarying(Struct.of(TemporalElement.class),
-					VaryingSize.Provider.constLimit(NumberSize.INT, 0));
+				                                             VaryingSize.Provider.constLimit(NumberSize.INT, 0));
 				assertGenerated(pipe);
 				var value = new TemporalElement();
 				value.duration = Duration.ofSeconds(300, 123_000_000);
@@ -198,13 +198,13 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void varyingNestedLayoutPreservesImmutableConstruction() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
 				var pipe = FixedVaryingStructPipe.tryVarying(Struct.of(ImmutableElement.class),
-					VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.LONG)));
+				                                             VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.LONG)));
 				assertGenerated(pipe);
 				assertThat(pipe.getType().needsBuilderObj()).isTrue();
 				var chunk = AllocateTicket.bytes(64).submit(DataProvider.newVerySimpleProvider());
@@ -218,13 +218,13 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void varyingNullableChildKeepsTrailingFieldAligned() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
 				var pipe = FixedVaryingStructPipe.tryVarying(Struct.of(NullableElement.class),
-					VaryingSize.Provider.repeat(List.of(NumberSize.SHORT, NumberSize.BYTE)));
+				                                             VaryingSize.Provider.repeat(List.of(NumberSize.SHORT, NumberSize.BYTE)));
 				assertGenerated(pipe);
 				var chunk = AllocateTicket.bytes(64).submit(DataProvider.newVerySimpleProvider());
 				for(var value : List.of(new NullableElement(new Child(300), (byte)91), new NullableElement(null, (byte)92))){
@@ -237,7 +237,7 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedReadersUseStandardAndFixedNestedPipes() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -248,20 +248,20 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	@Test
 	public void generatedReaderPreservesDistinctNestedLayouts() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
 			try(var ignored = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
 				// Both fields contain Child, but their configured pipes have different widths.
 				var pipe = FixedVaryingStructPipe.tryVarying(Struct.of(Element.class),
-					VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.BYTE)));
+				                                             VaryingSize.Provider.repeat(List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.BYTE)));
 				assertThat(pipe.getSizeDescriptor().requireFixed(WordSpace.BYTE)).isEqualTo(10);
 				assertRoundTrip(pipe, new Element(12, 5_000_000_000L, (byte)91));
 			}
 		}
 	}
-
+	
 	@Test
 	public void contiguousListReadsNestedObjectsAcrossWidthChanges() throws IOException, LockedFlagSet{
 		synchronized(ConfigDefs.OPTIMIZED_PIPE){
@@ -285,7 +285,7 @@ public class NestedSpecializedPipeTests{
 				assertElement(list.get(0), values.getFirst());
 				assertElement(list.get(3), values.getLast());
 				ContiguousIOList<Element> reopened = TestUtils.reopenMem(cluster).roots()
-					.request("nested", ContiguousIOList.class, Element.class);
+				                                              .request("nested", ContiguousIOList.class, Element.class);
 				assertGenerated(reopened.<Element>getFieldPipe(null, null));
 				assertThat(reopened.size()).isEqualTo(values.size());
 				for(int i = 0; i<reopened.size(); i++){
@@ -294,7 +294,7 @@ public class NestedSpecializedPipeTests{
 			}
 		}
 	}
-
+	
 	private static void assertRoundTrip(StructPipe<Element> pipe, Element value) throws IOException{
 		assertGenerated(pipe);
 		var chunk = AllocateTicket.bytes(64).submit(DataProvider.newVerySimpleProvider());
@@ -306,13 +306,13 @@ public class NestedSpecializedPipeTests{
 			assertElement(into, value);
 		}
 	}
-
+	
 	private static void assertGenerated(StructPipe<?> pipe){
 		if(pipe instanceof CheckedPipe.Standard<?> checked) pipe = checked.getUncheckedPipe();
 		if(pipe instanceof CheckedPipe.Fixed<?> checked) pipe = checked.getUncheckedPipe();
 		assertThat(pipe).isInstanceOf(StructPipe.SpecializedImplementation.class);
 	}
-
+	
 	private static void assertElement(Element actual, Element expected){
 		assertThat(actual.left.value).isEqualTo(expected.left.value);
 		assertThat(actual.right.value).isEqualTo(expected.right.value);

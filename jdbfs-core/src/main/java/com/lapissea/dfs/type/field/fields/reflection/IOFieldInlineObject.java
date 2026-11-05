@@ -212,7 +212,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 			writer.call("write", args -> args.get("provider").get("dest").get(value));
 		});
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, skip -> {

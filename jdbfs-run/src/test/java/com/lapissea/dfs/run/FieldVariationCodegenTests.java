@@ -18,22 +18,22 @@ import java.nio.ByteBuffer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class FieldVariationCodegenTests{
-	public enum Choice{ A, B, C }
+	public enum Choice{A, B, C}
 	
 	@StructPipe.Special
 	public static class Value extends IOInstance.Managed<Value>{
-		@IOValue @IONullability(IONullability.Mode.NULLABLE) public Choice choice;
-		@IOValue @IOCompression(IOCompression.Type.RLE) public byte[] rle;
-		@IOValue @IOCompression(IOCompression.Type.GZIP) public byte[] gzip;
-		@IOValue @IOCompression(IOCompression.Type.RLE) public ByteBuffer writable;
-		@IOValue @IOCompression(IOCompression.Type.GZIP) public ByteBuffer readOnly;
-		@IOValue public int trailing;
+		@IOValue @IONullability(IONullability.Mode.NULLABLE) public Choice     choice;
+		@IOValue @IOCompression(IOCompression.Type.RLE) public      byte[]     rle;
+		@IOValue @IOCompression(IOCompression.Type.GZIP) public     byte[]     gzip;
+		@IOValue @IOCompression(IOCompression.Type.RLE) public      ByteBuffer writable;
+		@IOValue @IOCompression(IOCompression.Type.GZIP) public     ByteBuffer readOnly;
+		@IOValue public                                             int        trailing;
 	}
 	
 	@Test
 	public void nullableEnumAndCompression() throws IOException{
 		StructPipe<Value> generated = StandardStructPipe.of(Value.class, StructPipe.STATE_DONE);
-		var unchecked = generated instanceof CheckedPipe.Standard<Value> checked? checked.getUncheckedPipe() : generated;
+		var               unchecked = generated instanceof CheckedPipe.Standard<Value> checked? checked.getUncheckedPipe() : generated;
 		assertThat(unchecked).isInstanceOf(StructPipe.SpecializedImplementation.class);
 		var interpreted = new StandardStructPipe<>(Struct.of(Value.class), StructPipe.STATE_DONE);
 		for(Choice choice : new Choice[]{null, Choice.A, Choice.B, Choice.C}){

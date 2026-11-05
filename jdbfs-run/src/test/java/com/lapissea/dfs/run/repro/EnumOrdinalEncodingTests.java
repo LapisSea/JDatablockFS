@@ -14,13 +14,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class EnumOrdinalEncodingTests{
-	public enum Three{ A, B, C }
-	public enum Two{ A, B }
-
+	public enum Three{A, B, C}
+	
+	public enum Two{A, B}
+	
 	@Test
 	void validOrdinalsRoundTrip() throws IOException{
 		var universe = EnumUniverse.of(Three.class);
-		var data = new byte[8];
+		var data     = new byte[8];
 		try(var out = new BitOutputStream(new ContentOutputStream.BA(data))){
 			for(var value : universe) out.writeEnum(universe, value);
 		}
@@ -28,16 +29,16 @@ public class EnumOrdinalEncodingTests{
 			for(var value : universe) assertThat(in.readEnum(universe)).isSameAs(value);
 		}
 	}
-
+	
 	@Test
 	void invalidOrdinalThrowsIOException() throws IOException{
 		var universe = EnumUniverse.of(Three.class);
 		try(var in = new BitInputStream(new ContentInputStream.BA(new byte[]{(byte)0xFF}), universe.bitSize)){
 			assertThatThrownBy(() -> in.readEnum(universe)).isInstanceOf(IOException.class)
-				.hasMessageContaining("3").hasMessageContaining(Three.class.getName());
+			                                               .hasMessageContaining("3").hasMessageContaining(Three.class.getName());
 		}
 	}
-
+	
 	@Test
 	void nullableOrdinalsIncludeNull() throws IOException{
 		var universe = EnumUniverse.of(Two.class);
@@ -48,23 +49,23 @@ public class EnumOrdinalEncodingTests{
 		}
 		try(var in = new BitInputStream(new ContentInputStream.BA(new byte[]{(byte)0xFF}), universe.nullableBitSize)){
 			assertThatThrownBy(() -> in.readEnum(universe, true)).isInstanceOf(IOException.class)
-				.hasMessageContaining("2").hasMessageContaining(Two.class.getName());
+			                                                     .hasMessageContaining("2").hasMessageContaining(Two.class.getName());
 		}
 	}
-
+	
 	@Test
 	void invalidOrdinalInLaterBatchThrowsIOException() throws IOException{
 		var universe = EnumUniverse.of(Three.class);
-		var data = new byte[16];
+		var data     = new byte[16];
 		try(var out = new BitOutputStream(new ContentOutputStream.BA(data))){
 			for(int i = 0; i<40; i++) out.writeBits(i == 35? 3 : i%3, universe.bitSize);
 		}
 		try(var in = new BitInputStream(new ContentInputStream.BA(data), 40*universe.bitSize)){
 			assertThatThrownBy(() -> universe.read(40, in)).isInstanceOf(IOException.class)
-				.hasMessageContaining("3").hasMessageContaining(Three.class.getName());
+			                                               .hasMessageContaining("3").hasMessageContaining(Three.class.getName());
 		}
 	}
-
+	
 	@Test
 	void singleFlagRejectsInvalidOrdinal() throws IOException{
 		try(var in = new ContentInputStream.BA(new byte[]{(byte)0xFF})){

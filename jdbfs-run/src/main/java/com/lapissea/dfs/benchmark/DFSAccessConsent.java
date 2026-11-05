@@ -9,7 +9,7 @@ import java.lang.invoke.MethodHandles;
  * The walk from {@code com.lapissea.dfs.benchmark} never reaches {@code com.lapissea.dfs.run.DFSAccessConsent}
  */
 public final class DFSAccessConsent{
-
+	
 	static{ IOInstance.allowFullAccess(MethodHandles.lookup()); }
-
+	
 }

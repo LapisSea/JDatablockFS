@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
-import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.SealedUtil;
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -94,8 +94,8 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	}
 	@Override
 	protected Set<TypeFlag> computeTypeFlags(){
-		var flags = EnumSet.noneOf(TypeFlag.class);
-		var type = IOFieldTools.unwrapOptionalTypeRequired(getAccessor().getGenericType(null));
+		var     flags   = EnumSet.noneOf(TypeFlag.class);
+		var     type    = IOFieldTools.unwrapOptionalTypeRequired(getAccessor().getGenericType(null));
 		boolean generic = IOFieldTools.isGeneric(getAccessor());
 		if(generic || SealedUtil.isSealedCached(Utils.typeToRaw(type))){
 			flags.add(TypeFlag.DYNAMIC);
@@ -157,17 +157,17 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		//Noop value field is skipped
 	}
-
+	
 	@Override
 	public void injectWriteField(CodeBlock body, AccessMap accessMap){
 		// The companion value field stores the optional's contents.
 	}
-
+	
 	@Override
 	public void injectSkipField(CodeBlock body, AccessMap accessMap){
 		// The companion value field consumes the optional's bytes.
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		accessMap.set(getAccessor(), body, value -> value.call(Optional.class, "ofNullable", args -> {

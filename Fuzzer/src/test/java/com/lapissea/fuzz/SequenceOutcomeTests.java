@@ -1,11 +1,12 @@
 package com.lapissea.fuzz;
 
+import org.testng.annotations.Test;
+
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.random.RandomGenerator;
 
-import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class SequenceOutcomeTests{
 	private FuzzingRunner<AtomicInteger, Object, RuntimeException> runner(AtomicInteger applied){

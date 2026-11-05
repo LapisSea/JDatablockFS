@@ -133,11 +133,11 @@ public class UnifiedRunTest{
 									active = null;
 								}
 								case Wire.Cancel cancel -> {
-								if(cancel.jobId() != null){
-									wire.send(new Wire.CleanupComplete(cancel.jobId(), null));
+									if(cancel.jobId() != null){
+										wire.send(new Wire.CleanupComplete(cancel.jobId(), null));
+									}
+									return;
 								}
-								return;
-							}
 								default -> { }
 							}
 							if(active == null && !queued.isEmpty()){

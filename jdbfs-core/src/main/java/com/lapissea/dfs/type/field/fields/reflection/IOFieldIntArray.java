@@ -174,7 +174,7 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 			});
 		});
 	}
-
+	
 	@Override
 	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		body.get("src").call("skipExact", args -> {
@@ -184,7 +184,7 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 			args.get(NumberSize.class, "bytes").cast(long.class).mul();
 		});
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, null, bod -> {

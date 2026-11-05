@@ -117,7 +117,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 			    .getArrayElement();
 		});
 	}
-
+	
 	@Override
 	public void injectWriteFieldToBits(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		accessMap.markTemporary();

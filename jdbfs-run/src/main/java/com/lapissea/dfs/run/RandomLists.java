@@ -36,7 +36,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
 public final class RandomLists{
-
+	
 	public static void main(String[] args){
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER|LogUtil.Init.USE_CALL_THREAD);
 		Configuration conf = new Configuration();

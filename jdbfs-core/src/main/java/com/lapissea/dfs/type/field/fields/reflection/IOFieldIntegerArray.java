@@ -238,7 +238,7 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 		var nSiz = getNumSize(ioPool, instance);
 		src.skipExact(size*(long)nSiz.bytes);
 	}
-
+	
 	@Override
 	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		injectWriteFieldNullable(body, accessMap, null, writer -> {
@@ -264,7 +264,7 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 			});
 		});
 	}
-
+	
 	@Override
 	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		body.get("src").call("skipExact", args -> {
@@ -274,7 +274,7 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 			args.get(NumberSize.class, "bytes").cast(long.class).mul();
 		});
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, null, bod -> {
@@ -285,8 +285,8 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 			var width = accessMap.temporaryLocalField(NumberSize.class, "numberSize", bod);
 			accessMap.get(numSize, bod);
 			bod.set(width);
-			boolean array = getType().isArray();
-			var result = accessMap.temporaryLocalField(array? Integer[].class : ArrayList.class, "integers", bod);
+			boolean array  = getType().isArray();
+			var     result = accessMap.temporaryLocalField(array? Integer[].class : ArrayList.class, "integers", bod);
 			bod.newObj(array? Integer[].class : ArrayList.class, args -> args.get(size)).set(result);
 			var index = accessMap.temporaryLocalField(int.class, "index", bod);
 			bod.set(index, 0);

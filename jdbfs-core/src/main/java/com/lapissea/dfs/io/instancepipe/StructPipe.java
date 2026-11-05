@@ -198,7 +198,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		waitForState(STATE_IO_FIELD);
 		return new PipeFieldCompiler.Result<>(List.copyOf(getSpecificFields()), builderMetadata);
 	}
-
+	
 	protected StructPipe<ProxyBuilder<T>> createBuilderPipe(Object builderMetadata){
 		var struct = getType().getBuilderObjType(true);
 		
@@ -753,7 +753,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			else field.writeReported(ioPool, provider, dest, instance);
 		}
 	}
-
+	
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		generateAll(ioPool, provider, instance, true);
 		if(instance instanceof IOInstance.Unmanaged) return null;
@@ -1130,7 +1130,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 			
-			var cw = ClassDefinition.hiddenNestmate(type).finalAcc();
+			var cw        = ClassDefinition.hiddenNestmate(type).finalAcc();
 			var constants = new ArrayList<Object>();
 			
 			cw.typeDef("GeneratorPipeClass", this.getClass());

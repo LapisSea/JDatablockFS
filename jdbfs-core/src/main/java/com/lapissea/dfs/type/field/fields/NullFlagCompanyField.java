@@ -79,8 +79,7 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 			}
 		});
 	}
-
-	/** The writer consumes the non-null field value from the operand stack. */
+	
 	protected final void injectWriteFieldNullable(CodeBlock body, SpecializedGenerator.AccessMap accessMap, CodeArg whenNull, CodeArg writer) throws MalformedJorth{
 		accessMap.getValue(this, body);
 		if(nullable()){

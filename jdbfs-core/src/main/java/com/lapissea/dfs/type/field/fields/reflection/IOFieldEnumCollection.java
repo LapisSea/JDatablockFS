@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.bit.EnumUniverse;
@@ -23,7 +23,6 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
-
 import com.lapissea.jorth.CodeArg;
 import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
@@ -184,7 +183,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			});
 		});
 	}
-
+	
 	@Override
 	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		body.get("src").call("skipExact", args -> {
@@ -192,7 +191,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			args.cast(long.class).mul(universe.bitSize).add(7).bitShiftRight(true, 3);
 		});
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, null, bod -> {
@@ -212,7 +211,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			bod.cast(getType());
 		});
 	}
-
+	
 	private int byteCount(int len){
 		return BitUtils.bitsToBytes(universe.bitSize*len);
 	}

@@ -22,7 +22,7 @@ public class StringifyTests{
 	public static class Point extends IOInstance.Managed<Point>{
 		int x;
 		int y;
-		public Point(){ }
+		public Point()            { }
 		public Point(int x, int y){ this.x = x; this.y = y; }
 	}
 	
@@ -38,7 +38,7 @@ public class StringifyTests{
 		boolean active;
 		boolean hidden;
 		@IONullability(NULLABLE)
-		String  note;
+		String note;
 		public Flags(){ }
 	}
 	

@@ -4,7 +4,7 @@ import org.testng.annotations.Test;
 
 import java.util.random.RandomGenerator;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertTrue;
 
 /**
  * Regression for a deterministically reproducible "create" failure being wrongly reported as unstable,
@@ -14,8 +14,10 @@ public class FuzzFailStabilityTests{
 	
 	private static FuzzingRunner<Object, Object, RuntimeException> createFailingRunner(){
 		return new FuzzingRunner<>(new FuzzingStateEnv.Marked<>(){
-			@Override public Object create(RandomGenerator random, long index, RunMark mark){ throw new IllegalStateException("create boom"); }
-			@Override public void applyAction(Object state, long index, Object action, RunMark mark){ }
+			@Override
+			public Object create(RandomGenerator random, long index, RunMark mark){ throw new IllegalStateException("create boom"); }
+			@Override
+			public void applyAction(Object state, long index, Object action, RunMark mark){ }
 		}, FuzzingRunner::noopAction);
 	}
 	

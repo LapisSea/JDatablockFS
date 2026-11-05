@@ -13,16 +13,16 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.FieldNames;
+import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -136,7 +136,7 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext){
 		//nothing to do. Reference field stores the actual pointer
 	}
-
+	
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		var referenceField = getDependencies().requireExact(Reference.class, FieldNames.ref(getAccessor()));

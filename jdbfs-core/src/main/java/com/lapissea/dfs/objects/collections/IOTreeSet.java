@@ -18,16 +18,7 @@ import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.StringJoiner;
-import java.util.TreeSet;
+import java.util.*;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -144,7 +135,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 	
 	@Override
 	public boolean acceptsType(IOType requested){ return getTypeDef().equals(((IOType.RawAndArg)requested).withDefaultArgs(IOType.TypeRaw.OBJ)); }
-
+	
 	public IOTreeSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
 		super(provider, identity, ((IOType.RawAndArg)typeDef).withDefaultArgs(IOType.TypeRaw.OBJ));
 		
@@ -164,7 +155,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 		blankNodeIdsScanned = false; blankValueIdsScanned = false;
 		readManagedFields();
 	}
-
+	
 	private record IndexedNode(long idx, @NotNull Node node){
 		private IndexedNode{
 			Objects.requireNonNull(node);
@@ -607,9 +598,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 		var nodes = this.nodes;
 		return new IOIterator<>(){
 			private final Deque<Integer> stack = new ArrayDeque<>();
-			private T val;
-			private boolean hasVal;
-			private boolean initialized;
+			private       T              val;
+			private       boolean        hasVal;
+			private       boolean        initialized;
 			private void pushLeftPath(int idx) throws IOException{
 				while(idx != -1){
 					stack.push(idx);
@@ -620,7 +611,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 			private void advance() throws IOException{
 				hasVal = false;
 				if(!initialized){
-					if(nodes.size() > 0) pushLeftPath(0);
+					if(nodes.size()>0) pushLeftPath(0);
 					initialized = true;
 				}
 				if(stack.isEmpty()) return;
