@@ -5,8 +5,10 @@ import com.lapissea.dfs.type.compilation.JorthUtils;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.FunctionDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -84,6 +86,14 @@ public final class TempClassGen{
 			Objects.requireNonNull(constructors);
 			Objects.requireNonNull(annotations);
 			Objects.requireNonNull(extras);
+			
+			constructors = Iters.from(constructors).filter(c -> {
+				return fieldsCtorFits(switch(c){
+					case CtorType.All ignored -> fields;
+					case CtorType.Empty ignored -> List.of();
+					case CtorType.Some(var names) -> Iters.from(fields).filter(f -> names.contains(f.name)).toList();
+				});
+			}).toModSet();
 		}
 		
 		@Override
@@ -188,6 +198,12 @@ public final class TempClassGen{
 			throw new RuntimeException("Failed to generate class", e);
 		}
 	}
+	
+	public static boolean fieldsCtorFits(List<FieldGen> fields){
+		var types = Iters.from(fields).toList(f -> GenericType.of(f.type));
+		return FunctionDefinition.argSlots(false, types)<=FunctionDefinition.MAX_ARG_SLOTS;
+	}
+	
 	private static void writeFieldsCtor(ClassDefinition cw, List<FieldGen> fields) throws MalformedJorth{
 		var init = cw.instanceInit();
 		

@@ -28,18 +28,21 @@ import com.lapissea.fuzz.distributed.master.DistributedSession;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeFunction;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -347,7 +350,7 @@ public final class StructFuzzTest{
 		
 		var fs   = Iters.from(def.fields());
 		var rand = new RawRandom(def.name().hashCode());
-		var ctor = typ.getConstructor(fs.map(TempClassGen.FieldGen::type).toArray(Class[]::new));
+		var make = instanceFactory(def, typ);
 		
 		
 		var mem = Cluster.emptyMem();
@@ -366,7 +369,7 @@ public final class StructFuzzTest{
 		}
 		
 		for(int i = 0; i<20; i++){
-			var inst = ctor.newInstance(fs.map(t -> t.generator().apply(rand)).toArray(Object[]::new));
+			var inst = make.apply(fs.map(t -> t.generator().apply(rand)).toArray(Object[]::new));
 			TestUtils.checkPipeInOutEquality(ch, pipe, inst);
 			
 			for(var fs1 : sets){
@@ -379,6 +382,13 @@ public final class StructFuzzTest{
 		
 		var fields = Iters.rand(rand, fieldCount, 0, fieldTypes.size()).enumerate()
 		                  .toList(e -> fieldTypes.get(e.val()).apply("field" + e.index(), rand));
+		
+		if(!TempClassGen.fieldsCtorFits(fields)){
+			// Make all fields non final when can't fit in ctor
+			fields = Iters.from(fields).toList(f -> !f.isFinal()? f : new TempClassGen.FieldGen(
+				f.name(), f.visibility(), false, f.type(), f.annotations(), f.generator()
+			));
+		}
 		
 		boolean hasFinal = Iters.from(fields).anyMatch(TempClassGen.FieldGen::isFinal);
 		
@@ -401,5 +411,27 @@ public final class StructFuzzTest{
 			IOInstance.Managed.class,
 			annotations,
 			List.of());
+	}
+	
+	private static <T> UnsafeFunction<Object[], T, ReflectiveOperationException> instanceFactory(TempClassGen.ClassGen def, Class<T> typ) throws ReflectiveOperationException{
+		if(def.constructors().contains(new TempClassGen.CtorType.All())){
+			var ctor = typ.getConstructor(Iters.from(def.fields()).map(TempClassGen.FieldGen::type).toArray(Class[]::new));
+			return ctor::newInstance;
+		}
+		
+		var ctor   = typ.getConstructor();
+		var fields = new ArrayList<Field>();
+		for(var f : def.fields()){
+			var field = typ.getDeclaredField(f.name());
+			field.setAccessible(true);
+			fields.add(field);
+		}
+		return args -> {
+			var inst = ctor.newInstance();
+			for(int i = 0; i<args.length; i++){
+				fields.get(i).set(inst, args[i]);
+			}
+			return inst;
+		};
 	}
 }
