@@ -316,6 +316,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		if(access.isFinal() && !type.canBeFinal){
 			throw new MalformedJorth("Can not make a final " + type);
 		}
+		if(type == ClassType.ENUM){
+			for(var fn : danglingFunctions) fn.requireFitsAsEnumConstructor();
+			for(var fn : functions.values()) fn.requireFitsAsEnumConstructor();
+		}
 		this.type = Objects.requireNonNull(type);
 		if(type.mustBeFinal){
 			finalAcc();

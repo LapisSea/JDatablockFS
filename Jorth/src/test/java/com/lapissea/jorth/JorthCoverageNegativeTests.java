@@ -1,6 +1,9 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.IllegalClassState;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
 
@@ -189,5 +192,98 @@ public class JorthCoverageNegativeTests{
 		});
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
 		                  .hasMessageContaining("Required at least 1");
+	}
+	
+	// ------------------------------------------------------------------ argument slot limit
+	
+	private static FunctionDefinition slotArgs(FunctionDefinition fn, int longs, int ints){
+		for(int i = 0; i<longs; i++) fn.arg(long.class, "l" + i);
+		for(int i = 0; i<ints; i++) fn.arg(int.class, "i" + i);
+		return fn;
+	}
+	
+	@Test
+	void argSlotsAtLimitLoad() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			// 127*2 + 1 = 255
+			slotArgs(cd.function("wide").staticAcc(), 127, 1).body();
+			// this + 2*2 + 250 = 255
+			slotArgs(cd.instanceInit(), 2, 250).body().callSuper(e -> { });
+		});
+		assertThat(cls.getDeclaredMethods()).anyMatch(m -> m.getName().equals("wide") && m.getParameterCount() == 128);
+		assertThat(cls.getDeclaredConstructors()).anyMatch(c -> c.getParameterCount() == 252);
+	}
+	
+	private static final String OVER_BY_ONE = ".*argument slots: 256 .*";
+	
+	private static FunctionDefinition function(){
+		return new ClassDefinition(null).function("test");
+	}
+	
+	@Test(expectedExceptions = IllegalClassState.class, expectedExceptionsMessageRegExp = OVER_BY_ONE)
+	void instanceArgOverLimit(){
+		// this + 254 = 255
+		var fn = slotArgs(function(), 0, 254);
+		fn.arg(int.class, "over");
+	}
+	
+	@Test(expectedExceptions = IllegalClassState.class, expectedExceptionsMessageRegExp = OVER_BY_ONE)
+	void staticArgOverLimit(){
+		var fn = slotArgs(function().staticAcc(), 0, 255);
+		fn.arg(int.class, "over");
+	}
+	
+	@Test(expectedExceptions = IllegalClassState.class, expectedExceptionsMessageRegExp = OVER_BY_ONE)
+	void wideArgOverLimit(){
+		// 127*2 = 254, a long needs the 2 slots that only 1 is left for
+		var fn = slotArgs(function().staticAcc(), 127, 0);
+		fn.arg(long.class, "over");
+	}
+	
+	@Test(expectedExceptions = IllegalClassState.class, expectedExceptionsMessageRegExp = OVER_BY_ONE)
+	void leavingStaticOverLimit(){
+		var fn = slotArgs(function().staticAcc(), 0, 255);
+		fn.access(AccessSet.DEFAULT);
+	}
+	
+	@Test
+	void staticAccFreesTheThisSlot() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var fn = slotArgs(cd.function("test"), 0, 254).staticAcc();
+			fn.arg(int.class, "freed");
+			fn.body();
+		});
+		assertThat(cls.getDeclaredMethods()).anyMatch(m -> m.getParameterCount() == 255);
+	}
+	
+	private static ClassDefinition enumClass() throws MalformedJorth{
+		return new ClassDefinition(null).name(ClassName.dotted("test.SlotEnum")).type(ClassType.ENUM);
+	}
+	
+	@Test
+	void enumConstructorAtLimitLoads() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			// this + name + ordinal + 252 = 255
+			slotArgs(cd.instanceInit(), 0, 252).body();
+			cd.enumConstant("A", c -> {
+				for(int i = 0; i<252; i++) c.val(i);
+			});
+		});
+		assertThat(cls.getEnumConstants()).hasSize(1);
+	}
+	
+	@Test(expectedExceptions = IllegalClassState.class, expectedExceptionsMessageRegExp = OVER_BY_ONE)
+	void enumConstructorArgOverLimit() throws Exception{
+		var fn = slotArgs(enumClass().instanceInit(), 0, 252);
+		fn.arg(int.class, "over");
+	}
+	
+	@Test(expectedExceptions = IllegalClassState.class, expectedExceptionsMessageRegExp = OVER_BY_ONE)
+	void becomingEnumOverLimit() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted("test.SlotEnum"));
+		// this + 253 = 254, the hidden name and ordinal add 2
+		slotArgs(cd.instanceInit(), 0, 253);
+		cd.type(ClassType.ENUM);
 	}
 }

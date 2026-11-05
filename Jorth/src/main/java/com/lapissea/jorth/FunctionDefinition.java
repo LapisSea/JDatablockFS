@@ -63,8 +63,37 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	}
 	public FunctionDefinition arg(JType type, String name){
 		preBodyCheck();
+		
+		requireArgSlots(argSlots(isStatic(), getArgs()) + type.getBaseType().slots);
+		
 		args.put(name, type);
 		return this;
+	}
+	
+	/**
+	 * JVMS 4.3.3: "A method descriptor is valid only if it represents method parameters with a total length of 255 or less"
+	 */
+	public static final int MAX_ARG_SLOTS = 255;
+	
+	static final int ENUM_CONSTRUCTOR_HIDDEN_SLOTS = 2;
+	
+	void requireFitsAsEnumConstructor(){
+		if(!isConstructor() || isEnumConstructor()) return;
+		requireArgSlots(argSlots(isStatic(), args.values()) + ENUM_CONSTRUCTOR_HIDDEN_SLOTS);
+	}
+	
+	private void requireArgSlots(int slots){
+		if(slots>MAX_ARG_SLOTS){
+			throw new IllegalClassState("Function " + name + " has too many argument slots: " + slots + " (max: " + MAX_ARG_SLOTS + ")");
+		}
+	}
+	
+	public static int argSlots(boolean isStatic, Iterable<? extends JType> args){
+		int slots = isStatic? 0 : 1;
+		for(var arg : args){
+			slots += arg.getBaseType().slots;
+		}
+		return slots;
 	}
 	
 	public FunctionDefinition returns(Class<?> type, Class<?>... genericArgs){
@@ -109,6 +138,11 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		if(access.isAbstract() && body != null){
 			throw new IllegalStateException("Can not make function abstract when it has a body!");
 		}
+		
+		if(access.isStatic() != this.access.isStatic()){
+			requireArgSlots(argSlots(access.isStatic(), getArgs()));
+		}
+		
 		this.access = Objects.requireNonNull(access);
 		return this;
 	}
